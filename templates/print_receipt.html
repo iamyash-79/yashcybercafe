@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Invoice #{{ bill.id }}</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      font-size: 15px;
+      padding: 20px;
+      background: #0f172a;
+      color: #e0f7fa;
+    }
+
+    .invoice-copy {
+      margin-bottom: 60px;
+      page-break-after: always;
+    }
+
+    .copy-label {
+      text-align: center;
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      border-bottom: 2px dashed #00e5ff;
+      padding-bottom: 5px;
+      color: #00e5ff;
+      text-shadow: 0 0 5px #00e5ff;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .logo {
+      height: 60px;
+      filter: drop-shadow(0 0 5px #00e5ff);
+    }
+
+    .title {
+      text-align: center;
+      flex-grow: 1;
+    }
+
+    h2 {
+      font-size: 22px;
+      margin: 0;
+      color: #00e5ff;
+      text-shadow: 0 0 5px #00e5ff;
+    }
+
+    .contact {
+      text-align: center;
+      font-size: 14px;
+      color: #a5f3fc;
+      margin-bottom: 20px;
+    }
+
+    .info p {
+      margin: 6px 0;
+      color: #e0f7fa;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 16.5px;
+    }
+
+    th, td {
+      border: 1px solid #00e5ff;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background: rgba(0, 255, 255, 0.1);
+      color: #00e5ff;
+      text-shadow: 0 0 4px #00e5ff;
+    }
+
+    td {
+      color: #e0f7fa;
+    }
+
+    .total {
+      text-align: right;
+      margin-top: 15px;
+      font-weight: bold;
+      font-size: 17px;
+      color: #00ffc3;
+      text-shadow: 0 0 4px #00ffc3;
+    }
+
+    .bottom-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-top: 30px;
+    }
+
+    .signature {
+      text-align: right;
+      font-weight: bold;
+      border-top: 1px solid #00e5ff;
+      padding-top: 5px;
+      width: 200px;
+      color: #00e5ff;
+      text-shadow: 0 0 3px #00e5ff;
+    }
+
+    .qr {
+      max-height: 120px;
+      filter: drop-shadow(0 0 5px #00e5ff);
+    }
+
+    .notice {
+      text-align: center;
+      margin-top: 25px;
+      font-weight: bold;
+      font-size: 14px;
+      color: #00e5ff;
+      text-shadow: 0 0 4px #00e5ff;
+    }
+
+    .actions {
+      margin-top: 20px;
+      text-align: right;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 16px;
+      margin-left: 10px;
+      background: #00bcd4;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 4px;
+      font-size: 13px;
+      box-shadow: 0 0 10px #00e5ff, 0 0 20px #00e5ff;
+      transition: 0.3s ease;
+    }
+
+    .btn:hover {
+      background: #0288d1;
+      box-shadow: 0 0 15px #00e5ff, 0 0 25px #00e5ff;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+        color: #000;
+      }
+
+      th, td {
+        border: 1px solid #000;
+        color: #000;
+      }
+
+      .notice, .signature, .total, .copy-label, h2 {
+        color: #000;
+        text-shadow: none;
+      }
+
+      .btn,
+      .no-print {
+        display: none;
+      }
+
+      .invoice-copy {
+        page-break-after: always;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  {% for label in ['Customer Copy', 'Office Copy'] %}
+  <div class="invoice-copy">
+    <div class="copy-label">{{ label }}</div>
+
+    <div class="header">
+      <img src="{{ url_for('static', filename='images/admin.png') }}" alt="Logo" class="logo">
+      <div class="title">
+        <h2>Yash Cyber Cafe</h2>
+        <div class="contact">
+          Gedra Gattasilli, Dhamtari - 493778<br>
+          Phone: 7987190554
+        </div>
+      </div>
+    </div>
+
+    <hr style="border: 1px solid #00e5ff; margin: 10px 0;">
+
+    <div class="info">
+      <p><strong>Invoice No:</strong> {{ bill.id }}</p>
+      <p><strong>Name:</strong> {{ bill.name }}</p>
+      <p><strong>Contact:</strong> {{ bill.contact }}</p>
+      <p><strong>Address:</strong> {{ bill.address1 }} {{ bill.address2 }}, {{ bill.city }} - {{ bill.pincode }}</p>
+      <p><strong>Date:</strong> {{ bill.created_at }}</p>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>Price</th>
+          <th>Discounted</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ item.item_name }}</td>
+          <td>{{ item.quantity }}</td>
+          <td>₹{{ "%.2f"|format(item.price) }}</td>
+          <td>₹{{ "%.2f"|format(item.discount_price) }}</td>
+          <td>₹{{ "%.2f"|format(item.total) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="total">
+      Grand Total: ₹{{ "%.2f"|format(items | sum(attribute='total')) }}
+    </div>
+
+    <div class="bottom-row">
+      <img src="{{ url_for('static', filename='images/qr.jpg') }}" alt="QR Code" class="qr">
+      <div class="signature">Authorized Signature</div>
+    </div>
+
+    <div class="notice">
+      ~ THIS IS A DIGITALLY CREATED INVOICE ~
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="actions no-print">
+    <button onclick="window.print()" class="btn">🖨️ Print</button>
+    <a href="/bill" class="btn">🔙 Back</a>
+  </div>
+
+</body>
+</html>

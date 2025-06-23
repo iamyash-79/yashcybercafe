@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" x-data="billApp()">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bill - {{ full_name }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/alpinejs" defer></script>
+  <style>
+    [x-cloak] { display: none; }
+    body { background: linear-gradient(135deg, #000428, #004e92); color: #e0f7fa; }
+    .glass {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 20px rgba(0, 230, 255, 0.3);
+    }
+    .neon-hover:hover {
+      color: #00e6ff;
+      text-shadow: 0 0 5px #00e6ff, 0 0 10px #00e6ff;
+    }
+  </style>
+</head>
+<body class="bg-[#0f172a] text-cyan-100 overflow-hidden">
+  <div class="flex flex-col md:flex-row h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <div class="w-full md:w-56 md:h-full fixed md:relative z-40 top-0 left-0">
+      {% include 'sidebar.html' %}
+    </div>
+
+    <!-- Main -->
+    <main class="flex-1 md:ml-38 px-3 md:px-6 pt-20 pb-6 overflow-y-auto">
+      <!-- Bill Table -->
+      <div class="glass rounded-xl text-white border border-cyan-500">
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm text-left">
+            <thead class="text-cyan-300 text-xs uppercase border-b border-cyan-500 bg-[#0f172a] sticky top-0 z-10">
+              <tr>
+                <th class="px-4 py-2">S.No.</th>
+                <th class="px-4 py-2">Name</th>
+                <th class="px-4 py-2">Contact</th>
+                <th class="px-4 py-2">Amount</th>
+                <th class="px-4 py-2">Address</th>
+                <th class="px-4 py-2">Date & Time</th>
+                <th class="px-4 py-2">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for bill in bills %}
+              <tr class="border-b border-cyan-800 hover:bg-cyan-900/20 transition">
+                <td class="px-4 py-2">{{ loop.index }}</td>
+                <td class="px-4 py-2">{{ bill.name }}</td>
+                <td class="px-4 py-2">{{ bill.contact }}</td>
+                <td class="px-4 py-2 text-green-400 font-semibold">₹{{ bill.total }}</td>
+                <td class="px-4 py-2">{{ bill.address }}</td>
+                <td class="px-4 py-2">{{ bill.date }}</td>
+                <td class="px-4 py-2 flex gap-2">
+                  <a href="/bill/print/{{ bill.id }}" target="_blank" class="text-cyan-300 neon-hover text-sm">🖨️</a>
+                  <form method="POST" action="/bill/delete/{{ bill.id }}" onsubmit="return confirm('Delete this bill?')">
+                    <button class="text-red-400 hover:underline text-sm">🗑️</button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="7" class="text-center py-4 text-cyan-100/50">No bills available.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Floating Add Button -->
+      <button @click="showForm = true"
+        class="fixed bottom-6 right-6 bg-cyan-600 hover:bg-cyan-400 text-white text-lg px-5 py-3 rounded-full shadow-lg transition duration-300 z-50">
+        ➕ Add Bill
+      </button>
+    </main>
+  </div>
+
+  <!-- Add Bill Modal -->
+  <div x-show="showForm" x-cloak class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-3">
+    <form method="POST" @submit="calculateTotal"
+          class="glass text-white p-5 rounded-xl w-full max-w-3xl shadow-xl space-y-4 max-h-[95vh] overflow-y-auto">
+      <h2 class="text-2xl font-bold text-cyan-300">Add New Bill</h2>
+
+      <!-- Customer Info -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <input name="name" type="text" placeholder="Name *" required class="bg-transparent border border-cyan-400 rounded p-2 w-full" />
+        <input name="contact" type="text" placeholder="Contact No. *" required class="bg-transparent border border-cyan-400 rounded p-2 w-full" />
+        <input name="address1" type="text" placeholder="Address Line 1" class="bg-transparent border border-cyan-400 rounded p-2 w-full" />
+        <input name="address2" type="text" placeholder="Address Line 2" class="bg-transparent border border-cyan-400 rounded p-2 w-full" />
+        <input name="city" type="text" placeholder="City" class="bg-transparent border border-cyan-400 rounded p-2 w-full" />
+        <input name="pincode" type="text" placeholder="Pincode" class="bg-transparent border border-cyan-400 rounded p-2 w-full" />
+      </div>
+
+      <!-- Products -->
+      <div class="space-y-2">
+        <label class="block text-lg font-bold text-cyan-300">🛒 Products</label>
+        <template x-for="(product, i) in products" :key="i">
+          <div class="flex items-center gap-2">
+            <select :name="`product_name_${i}`" class="w-full bg-gray-800 border border-cyan-400 rounded p-2 text-white" @change="updateTotal">
+              <option value="">-- Select Product --</option>
+              {% for p in products %}
+              <option value="{{ p.name }}" :data-price="{{ p.discount_price or p.price }}">{{ p.name }}</option>
+              {% endfor %}
+            </select>
+            <input :name="`product_qty_${i}`" type="number" min="1" value="1"
+                   class="w-20 bg-gray-800 text-white border border-cyan-400 rounded p-1" @input="updateTotal" />
+            <button type="button" @click="products.splice(i, 1)" class="text-red-400 text-sm">✖</button>
+          </div>
+        </template>
+        <button type="button" @click="products.push({})" class="text-cyan-400 text-sm mt-1 neon-hover">+ Add Product</button>
+      </div>
+
+      <!-- Services -->
+      <div class="space-y-2">
+        <label class="block text-lg font-bold text-cyan-300">🛠️ Services</label>
+        <template x-for="(service, i) in services" :key="i">
+          <div class="flex items-center gap-2">
+            <select :name="`service_name_${i}`" class="w-full bg-gray-800 border border-cyan-400 rounded p-2 text-white" @change="updateTotal">
+              <option value="">-- Select Service --</option>
+              {% for s in services %}
+              <option value="{{ s.name }}" :data-price="{{ s.discount_price or s.price }}">{{ s.name }}</option>
+              {% endfor %}
+            </select>
+            <input :name="`service_qty_${i}`" type="number" min="1" value="1"
+                   class="w-20 bg-gray-800 text-white border border-cyan-400 rounded p-1" @input="updateTotal" />
+            <button type="button" @click="services.splice(i, 1)" class="text-red-400 text-sm">✖</button>
+          </div>
+        </template>
+        <button type="button" @click="services.push({})" class="text-cyan-400 text-sm mt-1 neon-hover">+ Add Service</button>
+      </div>
+
+      <!-- Total -->
+      <input name="total" x-model="total" type="number" step="0.01" readonly
+             class="w-full border border-cyan-500 bg-cyan-900/40 rounded p-2 text-xl font-bold text-cyan-100" placeholder="Total ₹" />
+
+      <!-- Submit Buttons -->
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" @click="showForm = false" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white">Cancel</button>
+        <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded text-white font-bold">💾 Save Bill</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Alpine.js Data -->
+  <script>
+    function billApp() {
+      return {
+        showForm: false,
+        products: [{}],
+        services: [{}],
+        total: 0,
+        updateTotal() {
+          let total = 0;
+          document.querySelectorAll("select[name^='product_name_']").forEach((sel, i) => {
+            const qty = parseInt(document.querySelector(`input[name='product_qty_${i}']`)?.value || 1);
+            const price = parseFloat(sel.selectedOptions[0]?.getAttribute("data-price") || 0);
+            total += qty * price;
+          });
+          document.querySelectorAll("select[name^='service_name_']").forEach((sel, i) => {
+            const qty = parseInt(document.querySelector(`input[name='service_qty_${i}']`)?.value || 1);
+            const price = parseFloat(sel.selectedOptions[0]?.getAttribute("data-price") || 0);
+            total += qty * price;
+          });
+          this.total = total.toFixed(2);
+        }
+      };
+    }
+  </script>
+</body>
+</html>
