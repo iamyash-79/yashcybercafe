@@ -129,9 +129,7 @@
                 </template>
               </td>
               <td class="p-2 text-center">
-                {% set dt = order.order_date.split(' ') %}
-                <div>{{ dt[0] }}</div>
-                <div>{{ dt[1] if dt|length > 1 else '' }}</div>
+                {{ order.order_date | datetimeformat }}
               </td>
               <td class="p-2 text-center relative" x-data="{ showMenu: false }">
                 {% if order.status == 'pending' %}

@@ -12,13 +12,13 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
       padding: 1rem;
     }
 
     .form-box {
       background: #1e1e2f;
-      padding: 2rem;
+      padding: 1.5rem;
       border-radius: 10px;
       width: 100%;
       max-width: 460px;
@@ -54,7 +54,6 @@
 
     .tabs {
       display: flex;
-      flex-wrap: nowrap;
       gap: 10px;
       margin-bottom: 1rem;
       justify-content: center;
@@ -63,12 +62,10 @@
     .tab-btn {
       flex: 1;
       text-align: center;
-      min-width: 50%;
     }
 
     .tab-content {
       display: none;
-      width: 100%;
     }
 
     .tab-content.active {
@@ -111,13 +108,17 @@
       white-space: nowrap;
     }
 
-    button.back-link {
+    .back-link {
       background: none;
       border: none;
       color: #0ff;
       font-weight: bold;
       cursor: pointer;
-      margin-top: 1rem;
+      margin-top: 1.5rem;
+      text-align: center;
+      display: block;
+      width: 100%;
+      font-size: 0.95rem;
     }
 
     @media (max-width: 480px) {
@@ -125,20 +126,16 @@
         flex-direction: row;
         gap: 6px;
       }
-
       .tab-btn {
         font-size: 0.9rem;
       }
-
       input, select {
         font-size: 0.9rem;
       }
-
       .otp-group {
         flex-direction: row;
         flex-wrap: wrap;
       }
-
       .otp-group button {
         flex-shrink: 0;
         min-width: 100px;
@@ -149,218 +146,209 @@
 </head>
 <body>
   <div class="form-box">
-    <h2>🔐 Recover Password</h2>
+    <h2 style="margin-bottom: 1rem;">🔐 Recover Password</h2>
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
-          <div class="flash {{ 'flash-error' if category == 'error' else 'flash-success' }}">{{ message }}</div>
+          <div class="flash {{ 'flash-error' if category == 'error' else 'flash-success' }}">{{ message|safe }}</div>
         {% endfor %}
       {% endif %}
     {% endwith %}
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab-btn active" onclick="showTab('security-tab')">🔐 Via Security Question</button>
-      <button class="tab-btn" onclick="showTab('otp-tab')">📧 Via Email OTP</button>
+      <button class="tab-btn active" onclick="showTab('security-tab')">🔐 Security Question</button>
+      <button class="tab-btn" onclick="showTab('otp-tab')">📧 Email OTP</button>
     </div>
 
-    <!-- Security Tab -->
-    <div class="tab-content active" id="security-tab">
-      <form method="POST" autocomplete="off" onsubmit="return validateSecurityForm()">
-        <label for="contact">Mobile Number</label>
-        <input type="text" id="contact" name="contact" placeholder="Your mobile number" />
+    <!-- Tabs Wrapper -->
+    <div class="tab-wrapper">
 
-        <div style="text-align: center; margin: 0.5rem 0; font-weight: bold; color: #ccc;">OR</div>
+      <!-- Security Tab -->
+      <div class="tab-content active" id="security-tab">
+        <form method="POST" autocomplete="off" onsubmit="return validateSecurityForm()">
+          <label for="contact">Mobile Number</label>
+          <input type="text" id="contact" name="contact" placeholder="Your mobile number" />
 
-        <label for="email">Email Address</label>
-        <input type="email" id="email" name="email" placeholder="Your email" />
+          <div style="text-align: center; margin: 0.5rem 0; font-weight: bold; color: #ccc;">OR</div>
 
-        <label for="question">Security Question <span style="color:red">*</span></label>
-        <select id="question" name="question" required>
-          <option value="">-- Select a question --</option>
-          {% for q in questions %}
-            <option value="{{ q[1] }}">{{ q[1] }}</option>
-          {% endfor %}
-        </select>
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" placeholder="Your email" />
 
-        <label for="answer">Your Answer <span style="color:red">*</span></label>
-        <input type="text" id="answer" name="answer" required placeholder="Answer to security question" />
+          <label for="question">Security Question <span style="color:red">*</span></label>
+          <select id="question" name="question" required>
+  <option value="">-- Select a question --</option>
+  {% for q in questions %}
+    <option value="{{ q['question'] }}">{{ q['question'] }}</option>
+  {% endfor %}
+</select>
 
-        <input type="submit" value="Recover Password" />
-        <div style="text-align: center;">
-          <button type="button" data-href="{{ url_for('login_user') }}?open_login=true"
-                  onclick="window.location.href=this.dataset.href" class="back-link">
-            🔐 Back to Login
-          </button>
-        </div>
-      </form>
-    </div>
+          <label for="answer">Your Answer <span style="color:red">*</span></label>
+          <input type="text" id="answer" name="answer" required placeholder="Answer to security question" />
 
-    <!-- OTP Tab -->
-<div class="tab-content" id="otp-tab">
-  <form method="POST" action="{{ url_for('recover_otp') }}" autocomplete="off" onsubmit="return validateOTPForm()">
+          <input type="submit" value="Recover Password" />
+        </form>
+      </div>
 
-    <label>Email Address <span style="color:red">*</span></label>
-    <input type="email" id="otp_email" name="otp_email" placeholder="Enter your email" required />
+      <!-- OTP Tab -->
+      <div class="tab-content" id="otp-tab">
+        <form method="POST" action="{{ url_for('recover_otp') }}" autocomplete="off" onsubmit="return validateOTPForm()">
+          <label>Email Address <span style="color:red">*</span></label>
+          <input type="email" id="otp_email" name="otp_email" placeholder="Enter your email" required />
 
-    <!-- Send OTP -->
-    <div class="otp-group">
-      <button type="button" onclick="sendOTP()" id="send-otp-btn">Send OTP</button>
-    </div>
+          <!-- Send OTP -->
+          <div class="otp-group">
+            <button type="button" onclick="sendOTP()" id="send-otp-btn">Send OTP</button>
+          </div>
 
-    <!-- OTP Input and Verify -->
-    <div id="otp-box" style="display: none;">
-      <label>Enter OTP</label>
-      <div class="otp-group">
-        <input type="text" id="otp_code" name="otp_code" placeholder="Enter OTP" />
-        <button type="button" onclick="verifyOTP()" id="verify-otp-btn">Verify OTP</button>
+          <!-- OTP Input and Verify -->
+          <div id="otp-box" style="display: none;">
+            <label>Enter OTP</label>
+            <div class="otp-group">
+              <input type="text" id="otp_code" name="otp_code" placeholder="Enter OTP" />
+              <button type="button" onclick="verifyOTP()" id="verify-otp-btn">Verify OTP</button>
+            </div>
+          </div>
+
+          <!-- Password Fields -->
+          <div id="password-section" style="display: none;">
+            <label>New Password</label>
+            <input type="password" name="new_password" placeholder="New Password" id="new_password" required />
+            <label>Confirm Password</label>
+            <input type="password" name="confirm_password" placeholder="Confirm Password" id="confirm_password" required />
+          </div>
+
+          <!-- Submit Reset Button -->
+          <input type="submit" value="Reset Password" />
+        </form>
       </div>
     </div>
 
-    <!-- Password Fields -->
-    <div id="password-section" style="display: none;">
-      <label>New Password</label>
-      <input type="password" name="new_password" placeholder="New Password" id="new_password" required />
-      <label>Confirm Password</label>
-      <input type="password" name="confirm_password" placeholder="Confirm Password" id="confirm_password" required />
-
-      <input type="submit" value="Reset Password" />
-    </div>
-
-    <!-- Back to Login -->
-    <div style="text-align: center;">
-      <button type="button" data-href="{{ url_for('login_user') }}?open_login=true"
-              onclick="window.location.href=this.dataset.href" class="back-link">
-        🔐 Back to Login
-      </button>
-    </div>
-  </form>
-</div>
-
-    {% if temp_password %}
-      <div class="temp-box">
-        🔑 Your Temporary Password:<br>
-        <code>{{ temp_password }}</code>
-      </div>
-    {% endif %}
+    <!-- Shared Back to Login Button -->
+    <button type="button" class="back-link"
+            onclick="handleBackToLogin(this)"
+            data-desktop="{{ url_for('login_user') }}?open_login=true"
+            data-mobile="/mobile?open=login">
+      🔐 Back to Login
+    </button>
   </div>
 
+  <!-- JS Scripts -->
   <script>
-  function showTab(tabId) {
-    document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
-    document.querySelectorAll(".tab-content").forEach(div => div.classList.remove("active"));
-
-    const targetTab = document.getElementById(tabId);
-    if (targetTab) targetTab.classList.add("active");
-
-    const activeBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
-    if (activeBtn) activeBtn.classList.add("active");
-  }
-
-  function validateSecurityForm() {
-    const email = document.getElementById("email")?.value.trim();
-    const contact = document.getElementById("contact")?.value.trim();
-    if (!email && !contact) {
-      alert("⚠️ Please fill at least Email or Mobile Number.");
-      return false;
-    }
-    return true;
-  }
-
-  function validateOTPForm() {
-    const email = document.getElementById("otp_email")?.value.trim();
-    const otp = document.getElementById("otp_code")?.value.trim();
-    const pw1 = document.getElementById("new_password")?.value;
-    const pw2 = document.getElementById("confirm_password")?.value;
-
-    if (!email || !otp || !pw1 || !pw2) {
-      alert("⚠️ Please complete all fields.");
-      return false;
+    function handleBackToLogin(button) {
+      const isMobile = window.innerWidth <= 768 || /Mobi|Android/i.test(navigator.userAgent);
+      const mobileHref = button.dataset.mobile;
+      const desktopHref = button.dataset.desktop;
+      window.location.href = isMobile ? mobileHref : desktopHref;
     }
 
-    if (pw1 !== pw2) {
-      alert("⚠️ Passwords do not match.");
-      return false;
+    function showTab(tabId) {
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(div => div.classList.remove("active"));
+      document.getElementById(tabId).classList.add("active");
+
+      // Highlight current button
+      const activeBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
+      if (activeBtn) activeBtn.classList.add("active");
     }
 
-    return true;
-  }
-
-  function sendOTP(event) {
-    const email = document.getElementById("otp_email")?.value.trim();
-    const button = event.target;
-
-    if (!email) {
-      alert("⚠️ Please enter your email.");
-      return;
-    }
-
-    button.disabled = true;
-    button.textContent = "Sending...";
-
-    fetch("/send-reset-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
-    })
-    .then(res => res.json())
-    .then(data => {
-      alert(data.message || "OTP sent.");
-      if (data.success) {
-        document.getElementById("otp-box").style.display = "block";
-        document.getElementById("verify-otp-group").style.display = "flex";  // Show verify button
+    function validateSecurityForm() {
+      const email = document.getElementById("email")?.value.trim();
+      const contact = document.getElementById("contact")?.value.trim();
+      if (!email && !contact) {
+        alert("⚠️ Please fill at least Email or Mobile Number.");
+        return false;
       }
-    })
-    .catch(err => {
-      console.error("OTP Error:", err);
-      alert("❌ Something went wrong while sending OTP.");
-    })
-    .finally(() => {
-      button.disabled = false;
-      button.textContent = "Send OTP";
-    });
-  }
-
-  function verifyOTP(event) {
-    const email = document.getElementById("otp_email")?.value.trim();
-    const otp = document.getElementById("otp_code")?.value.trim();
-    const button = event.target;
-
-    if (!email || !otp) {
-      alert("⚠️ Enter both Email and OTP.");
-      return;
+      return true;
     }
 
-    button.disabled = true;
-    button.textContent = "Verifying...";
+    function validateOTPForm() {
+      const email = document.getElementById("otp_email")?.value.trim();
+      const otp = document.getElementById("otp_code")?.value.trim();
+      const pw1 = document.getElementById("new_password")?.value;
+      const pw2 = document.getElementById("confirm_password")?.value;
 
-    fetch("/verify-reset-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp })
-    })
-    .then(res => res.json())
-    .then(data => {
-      alert(data.message);
-      if (data.success) {
-        document.getElementById("password-section").style.display = "block";
-        document.getElementById("otp_email").readOnly = true;
-        document.getElementById("otp_code").readOnly = true;
-        document.getElementById("send-otp-btn").disabled = true;
-        document.getElementById("verify-otp-btn").disabled = true;
+      if (!email || !otp || !pw1 || !pw2) {
+        alert("⚠️ Please complete all fields.");
+        return false;
       }
-    })
-    .catch(err => {
-      console.error("OTP Verification Error:", err);
-      alert("❌ Failed to verify OTP.");
-    })
-    .finally(() => {
-      button.textContent = "Verify OTP";
-      button.disabled = false;
-    });
-  }
-</script>
+
+      if (pw1 !== pw2) {
+        alert("⚠️ Passwords do not match.");
+        return false;
+      }
+
+      return true;
+    }
+
+    function sendOTP() {
+      const email = document.getElementById("otp_email")?.value.trim();
+      const button = document.getElementById("send-otp-btn");
+
+      if (!email) {
+        alert("⚠️ Please enter your email.");
+        return;
+      }
+
+      button.disabled = true;
+      button.textContent = "Sending...";
+
+      fetch("/send-reset-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || "OTP sent.");
+        if (data.success) {
+          document.getElementById("otp-box").style.display = "block";
+        }
+      })
+      .catch(() => alert("❌ Failed to send OTP."))
+      .finally(() => {
+        button.disabled = false;
+        button.textContent = "Send OTP";
+      });
+    }
+
+    function verifyOTP() {
+      const email = document.getElementById("otp_email")?.value.trim();
+      const otp = document.getElementById("otp_code")?.value.trim();
+      const button = document.getElementById("verify-otp-btn");
+
+      if (!email || !otp) {
+        alert("⚠️ Enter both Email and OTP.");
+        return;
+      }
+
+      button.disabled = true;
+      button.textContent = "Verifying...";
+
+      fetch("/verify-reset-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message);
+        if (data.success) {
+          document.getElementById("password-section").style.display = "block";
+          document.getElementById("otp_email").readOnly = true;
+          document.getElementById("otp_code").readOnly = true;
+          document.getElementById("send-otp-btn").disabled = true;
+          document.getElementById("verify-otp-btn").disabled = true;
+        }
+      })
+      .catch(() => alert("❌ OTP verification failed."))
+      .finally(() => {
+        button.textContent = "Verify OTP";
+        button.disabled = false;
+      });
+    }
+  </script>
 </body>
 </html>

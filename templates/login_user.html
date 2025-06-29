@@ -535,29 +535,29 @@
   }
 </style>
 
-  <section id="products" class="product-section">
+  <section id="products" class="products-section">
   <h2 style="color: #00ffe5; text-align: center; text-shadow: 0 0 6px #00ffe5; margin-bottom: 20px;">Explore Products</h2>
-  <div class="scroll-wrapper" id="productScrollWrapper" style="overflow:hidden; width: 100%;">
-    <div class="product-container" id="productScroll">
-      {% for product in product_items %}
-      <a href="{{ url_for('home') }}" class="product-card" style="text-decoration: none; color: inherit;">
-        {% if product.image_url %}
-          <img src="{{ url_for('static', filename='uploads/products/' ~ product.image_url) }}" alt="{{ product.name }}">
+  <div class="scroll-wrapper" id="productsScrollWrapper" style="overflow:hidden; width: 100%;">
+    <div class="products-container" id="productsScroll">
+      {% for products in products_items %}
+      <a href="{{ url_for('home') }}" class="products-card" style="text-decoration: none; color: inherit;">
+        {% if products.image_url %}
+          <img src="{{ url_for('static', filename='uploads/products/' ~ products.image_url) }}" alt="{{ products.name }}">
         {% else %}
           <img src="{{ url_for('static', filename='uploads/products/default.jpg') }}" alt="No Image">
         {% endif %}
-        <h3>{{ product.name }}</h3>
+        <h3>{{ products.name }}</h3>
       </a>
       {% endfor %}
       <!-- Duplicate for seamless loop -->
-      {% for product in product_items %}
-      <a href="{{ url_for('home') }}" class="product-card" style="text-decoration: none; color: inherit;">
-        {% if product.image_url %}
-          <img src="{{ url_for('static', filename='uploads/products/' ~ product.image_url) }}" alt="{{ product.name }}">
+      {% for products in products_items %}
+      <a href="{{ url_for('home') }}" class="products-card" style="text-decoration: none; color: inherit;">
+        {% if products.image_url %}
+          <img src="{{ url_for('static', filename='uploads/products/' ~ products.image_url) }}" alt="{{ products.name }}">
         {% else %}
           <img src="{{ url_for('static', filename='uploads/products/default.jpg') }}" alt="No Image">
         {% endif %}
-        <h3>{{ product.name }}</h3>
+        <h3>{{ products.name }}</h3>
       </a>
       {% endfor %}
     </div>
@@ -565,7 +565,7 @@
 </section>
 
 <style>
-  .product-section {
+  .products-section {
     padding: 3rem 2rem;
     background: rgba(0, 255, 255, 0.05);
     backdrop-filter: blur(8px);
@@ -573,15 +573,15 @@
     border-bottom: 2px solid #00ffe5;
   }
 
-  .product-container {
+  .products-container {
     display: flex;
     gap: 1rem;
     padding: 1rem;
     width: max-content;
-    animation: scroll-loop 40s linear infinite;
+    animation: scroll-loop 10s linear infinite;
   }
 
-  .product-container.paused {
+  .products-container.paused {
     animation-play-state: paused;
   }
 
@@ -590,11 +590,11 @@
     100% { transform: translateX(-50%); }
   }
 
-  .product-container::-webkit-scrollbar {
+  .products-container::-webkit-scrollbar {
     display: none;
   }
 
-  .product-card {
+  .products-card {
     flex: 0 0 auto;
     width: 200px;
     background: rgba(255, 255, 255, 0.05);
@@ -607,12 +607,12 @@
     transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
 
-  .product-card:hover {
+  .products-card:hover {
     transform: translateY(-8px);
     box-shadow: 0 0 15px #00ffe5;
   }
 
-  .product-card img {
+  .products-card img {
     max-width: 100%;
     height: 140px;
     object-fit: contain;
@@ -620,7 +620,7 @@
     margin-bottom: 0.5rem;
   }
 
-  .product-card h3 {
+  .products-card h3 {
     font-size: 0.85rem;
     color: #aef9ff;
     text-shadow: 0 0 4px #00e5ff;
@@ -633,7 +633,7 @@
     height: 2.4em;
   }
 
-  .product-card p {
+  .products-card p {
     color: #fff;
     font-weight: bold;
     font-size: 1rem;
@@ -641,31 +641,31 @@
   }
 
   @media (max-width: 768px) {
-    .product-card {
+    .products-card {
       width: 160px;
       padding: 0.8rem;
     }
 
-    .product-card img {
+    .products-card img {
       height: 120px;
     }
 
-    .product-card h3 {
+    .products-card h3 {
       font-size: 0.75rem;
     }
 
-    .product-card p {
+    .products-card p {
       font-size: 0.9rem;
     }
   }
 </style>
 <script>
   const scrollContainer = document.getElementById('serviceScroll');
-  const productContainer = document.getElementById('productScroll');
+  const productsContainer = document.getElementById('productsScroll');
 
   // Separate timers for each container
   let touchTimerScroll;
-  let touchTimerProduct;
+  let touchTimerproducts;
 
   // --- serviceScroll handlers ---
   scrollContainer.addEventListener('mouseenter', () => {
@@ -691,27 +691,27 @@
     }, 3000);
   });
 
-  // --- productScroll handlers ---
-  productContainer.addEventListener('mouseenter', () => {
-    productContainer.classList.add('paused');
+  // --- productsScroll handlers ---
+  productsContainer.addEventListener('mouseenter', () => {
+    productsContainer.classList.add('paused');
   });
-  productContainer.addEventListener('mouseleave', () => {
-    productContainer.classList.remove('paused');
+  productsContainer.addEventListener('mouseleave', () => {
+    productsContainer.classList.remove('paused');
   });
-  productContainer.addEventListener('touchstart', () => {
-    productContainer.classList.add('paused');
-    clearTimeout(touchTimerProduct);
+  productsContainer.addEventListener('touchstart', () => {
+    productsContainer.classList.add('paused');
+    clearTimeout(touchTimerproducts);
   });
-  productContainer.addEventListener('touchend', () => {
-    touchTimerProduct = setTimeout(() => {
-      productContainer.classList.remove('paused');
+  productsContainer.addEventListener('touchend', () => {
+    touchTimerproducts = setTimeout(() => {
+      productsContainer.classList.remove('paused');
     }, 3000);
   });
-  productContainer.addEventListener('scroll', () => {
-    productContainer.classList.add('paused');
-    clearTimeout(touchTimerProduct);
-    touchTimerProduct = setTimeout(() => {
-      productContainer.classList.remove('paused');
+  productsContainer.addEventListener('scroll', () => {
+    productsContainer.classList.add('paused');
+    clearTimeout(touchTimerproducts);
+    touchTimerproducts = setTimeout(() => {
+      productsContainer.classList.remove('paused');
     }, 3000);
   });
 </script>
@@ -721,15 +721,9 @@
     <!-- About Us -->
     <div class="footer-col">
       <h4>About Us</h4>
-      <p class="clickable" onclick="openModal('aboutModal')">About Us</p>
-      <p>Contact Us</p>
-     <a href="tel:+917987190554" style="text-decoration: none; color: inherit;">
-  <p><img src="https://img.icons8.com/ios-filled/24/000000/phone.png" alt="Call" class="icon" /> Call Us</p>
-</a>
-
-<a href="https://wa.me/918120709649" target="_blank" style="text-decoration: none; color: inherit;">
-  <p><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/whatsapp.svg" alt="WhatsApp" class="icon" /> WhatsApp</p>
-</a>
+      <a href="/quick-links#about" style="text-decoration: none; color: inherit;">About Us</a>
+      <br>
+      <a href="/quick-links#contact" style="text-decoration: none; color: inherit;">Contact Us</a>
     </div>
 
     <!-- Social -->
@@ -782,27 +776,7 @@
   <div class="footer-bottom">
     <p>All Rights Reserved © Yash Cyber Cafe</p>
   </div>
-
-  <!-- About Modal -->
-  <div class="modal" id="aboutModal">
-  <div class="modal-content">
-    <span class="modal-close" onclick="closeModal('aboutModal')">&times;</span>
-    <h3>About Us</h3>
-    <p>
-      Welcome to <strong>Yash Cyber Cafe</strong> – your one-stop destination for all your digital, printing, and online service needs. Whether you're looking to print important documents, access the internet, or complete government and online tasks, we’ve got you covered with fast, reliable, and affordable services.
-      <br><br>
-      At Yash Cyber Cafe, we provide:
-      <ul>
-        <li><strong>Printing & Scanning Services</strong> – High-quality prints for documents, photos, projects, and more.</li>
-        <li><strong>Online Services</strong> – From form filling, bill payments, and online registrations to exam applications and more.</li>
-        <li><strong>Computer Access</strong> – Smooth and secure internet browsing for study, work, or leisure.</li>
-        <li><strong>Tech Support</strong> – Friendly assistance to help you complete tasks easily and efficiently.</li>
-      </ul>
-      Customer satisfaction is at the heart of everything we do. With a commitment to accuracy, speed, and service, Yash Cyber Cafe is your trusted digital partner in town.
-    </p>
-  </div>
-</div>
-</footer>
+  </footer>
 
 
   <!-- Login Modal -->
@@ -827,7 +801,7 @@
       {% endif %}
     {% endwith %}
 
-    <form action="{{ url_for('login') }}" method="POST" autocomplete="off">
+    <form action="{{ url_for('login_user') }}" method="POST" autocomplete="off">
       <label for="login_email">Email</label>
       <input type="email" id="login_email" name="email" required placeholder="you@example.com" />
 
@@ -1069,29 +1043,29 @@
   let otpTimer;
 
   function startOTPTimer() {
-  if (otpTimer) clearInterval(otpTimer); // Prevent multiple timers
-  const msg = document.getElementById("otp-timer-msg");
-  msg.style.display = "block";
-  let seconds = otpCooldownTime;
-  
-  otpTimer = setInterval(() => {
-    if (seconds <= 0) {
-      clearInterval(otpTimer);
-      msg.style.display = "none";
-      const otpBtn = document.getElementById("otp-btn");
-      if (otpBtn) {
-        otpBtn.disabled = false;
-        otpBtn.style.opacity = 1;
-        otpBtn.style.cursor = "pointer";
+    if (otpTimer) clearInterval(otpTimer);
+    const msg = document.getElementById("otp-timer-msg");
+    msg.style.display = "block";
+    let seconds = otpCooldownTime;
+
+    otpTimer = setInterval(() => {
+      if (seconds <= 0) {
+        clearInterval(otpTimer);
+        msg.style.display = "none";
+        const otpBtn = document.getElementById("otp-btn");
+        if (otpBtn) {
+          otpBtn.disabled = false;
+          otpBtn.style.opacity = 1;
+          otpBtn.style.cursor = "pointer";
+        }
+        return;
       }
-      return;
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    msg.innerText = `⏳ Please wait ${mins}:${secs.toString().padStart(2, '0')} before resending OTP...`;
-    seconds--;
-  }, 1000);
-}
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      msg.innerText = `⏳ Please wait ${mins}:${secs.toString().padStart(2, '0')} before resending OTP...`;
+      seconds--;
+    }, 1000);
+  }
 
   function sendRegisterOTP() {
     const email = document.getElementById('email').value.trim();
@@ -1102,7 +1076,6 @@
       return;
     }
 
-    // Show spinner
     const originalText = otpBtn.innerHTML;
     otpBtn.innerHTML = 'Sending... <span class="spinner"></span>';
     otpBtn.disabled = true;
@@ -1122,25 +1095,32 @@
         startOTPTimer();
       } else {
         alert("❌ " + (data.message || "Unable to send OTP."));
-        otpBtn.disabled = false;
-        otpBtn.style.opacity = 1;
-        otpBtn.style.cursor = "pointer";
+        resetOtpBtn(otpBtn, originalText);
       }
     })
     .catch(err => {
       console.error("Error:", err);
       alert("❌ Error sending OTP.");
-      otpBtn.disabled = false;
-      otpBtn.style.opacity = 1;
-      otpBtn.style.cursor = "pointer";
+      resetOtpBtn(otpBtn, originalText);
     })
     .finally(() => {
       otpBtn.innerHTML = originalText;
     });
   }
 
+  function resetOtpBtn(btn, text) {
+    btn.disabled = false;
+    btn.style.opacity = 1;
+    btn.style.cursor = "pointer";
+    btn.innerHTML = text;
+  }
+
   function verifyRegisterOTP() {
     const otp = document.getElementById('otp').value.trim();
+    const otpInput = document.getElementById("otp");
+    const verifyBtn = document.getElementById("verify-btn");
+    const timerMsg = document.getElementById("otp-timer-msg");
+
     if (!otp) {
       alert("⚠️ Please enter the OTP.");
       return;
@@ -1155,13 +1135,31 @@
     .then(data => {
       if (data.verified) {
         alert("✅ OTP Verified!");
-        document.getElementById("otp").style.backgroundColor = "#d1fae5";
-        const btn = document.getElementById("registerBtn");
-        if (btn) {
-          btn.disabled = false;
-          btn.style.cursor = "pointer";
-          btn.style.backgroundColor = "#06b6d4";
-          btn.classList.remove("cursor-not-allowed");
+
+        // Disable input and hide verify button
+        otpInput.readOnly = true;
+        otpInput.style.backgroundColor = "#d1fae5";
+        if (verifyBtn) verifyBtn.remove();
+
+        // Stop timer and hide message
+        if (otpTimer) clearInterval(otpTimer);
+        if (timerMsg) timerMsg.style.display = "none";
+
+        // Show "Verified" message
+        const verifiedMsg = document.createElement("span");
+        verifiedMsg.textContent = "✅ Verified";
+        verifiedMsg.style.color = "#22c55e";
+        verifiedMsg.style.fontWeight = "bold";
+        verifiedMsg.style.marginLeft = "10px";
+        otpInput.parentNode.appendChild(verifiedMsg);
+
+        // Enable Register button
+        const regBtn = document.getElementById("registerBtn");
+        if (regBtn) {
+          regBtn.disabled = false;
+          regBtn.style.cursor = "pointer";
+          regBtn.style.opacity = 1;
+          regBtn.style.backgroundColor = "#06b6d4";
         }
       } else {
         alert("❌ " + (data.message || "Invalid OTP."));
@@ -1178,6 +1176,5 @@
     if (regBtn) regBtn.disabled = true;
   });
 </script>
-
 </body>
 </html>

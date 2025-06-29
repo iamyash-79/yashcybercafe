@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Yash Cyber Cafe</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet"/>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+    html, body {
+      background: #0a0f1c;
+      color: #ffffff;
+      width: 100%;
+      height: 100%;
+      font-size: 16px;
+      overflow-x: hidden;
+    }
+    .container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 5vw 4vw;
+      position: relative;
+    }
+    h2 {
+      color: #00ffe5;
+      margin-bottom: 1rem;
+      text-shadow: 0 0 8px #00ffe5;
+      font-size: 6vw;
+    }
+    form {
+      background: rgba(0, 255, 255, 0.05);
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      backdrop-filter: blur(12px);
+      padding: 6vw;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 100%;
+      box-shadow: 0 0 20px #00ffe5;
+    }
+    label {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #00ffe5;
+      display: block;
+      font-size: 4vw;
+    }
+    input, button {
+      width: 100%;
+      padding: 4vw;
+      margin-bottom: 4vw;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background-color: rgba(255, 255, 255, 0.05);
+      color: white;
+      font-size: 4vw;
+    }
+    button {
+      background: linear-gradient(45deg, #00ffe5, #1e90ff);
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover {
+      box-shadow: 0 0 12px #00ffe5;
+    }
+    .switch-text {
+      color: #81ddff;
+      text-align: center;
+      margin-top: 2vw;
+      font-size: 3.8vw;
+    }
+    .switch-text button {
+      background: none;
+      border: none;
+      color: #81ddff;
+      font-size: 3.8vw;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .skip-link {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      color: #81ddff;
+      font-weight: bold;
+      text-decoration: none;
+      font-size: 3.5vw;
+      z-index: 10;
+    }
+    .hidden { display: none; }
+    .otp-row {
+      display: flex;
+      gap: 2vw;
+      flex-direction: row;
+    }
+    .otp-row input {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .otp-row button {
+      padding: 3vw 4vw;
+      font-size: 3.5vw;
+      flex-shrink: 0;
+      width: auto;
+      background-color: #1e40af;
+      color: white;
+    }
+    .otp-timer {
+      font-size: 3.5vw;
+      color: #facc15;
+      margin-bottom: 1vw;
+    }
+    .extras {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 3.8vw;
+      margin-bottom: 4vw;
+      flex-wrap: wrap;
+      gap: 2vw;
+    }
+    .extras label {
+      display: flex;
+      align-items: center;
+      color: #81ddff;
+    }
+    .extras input[type="checkbox"] {
+      margin-right: 2vw;
+      transform: scale(1.3);
+    }
+    p.verified {
+      animation: fadein 0.5s ease;
+    }
+    @keyframes fadein {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .flash-wrapper {
+      width: 100%;
+      margin-bottom: 4vw;
+    }
+    .flash {
+      padding: 3vw;
+      border-radius: 8px;
+      font-size: 3.5vw;
+      margin-bottom: 2vw;
+      animation: fadein 0.4s ease-in-out;
+    }
+    .flash-success {
+      background-color: #22c55e;
+      color: #ffffff;
+    }
+    .flash-error,
+    .flash-login_error {
+      background-color: #ef4444;
+      color: #ffffff;
+    }
+    .flash-login_info {
+      background-color: #eab308;
+      color: #000000;
+    }
+    .flash-info {
+      background-color: #3b82f6;
+      color: #ffffff;
+    }
+    a {
+      color: #e50a0a;
+      text-decoration: none;
+      font-size: 3.8vw;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrapper">
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Login Form -->
+    <form id="loginForm" method="POST" action="/mobile">
+      <input type="hidden" name="action" value="login" />
+      <a href="{{ url_for('home') }}" class="skip-link">Skip</a>
+      <h2>Login</h2>
+      <label>Email</label>
+      <input type="email" name="email" required placeholder="you@example.com">
+      <label>Password</label>
+      <input type="password" name="password" required placeholder="Enter your password">
+      <div class="extras">
+        <label><input type="checkbox" name="remember"> Remember me</label>
+        <a href="{{ url_for('forgot') }}">Forgot?</a>
+      </div>
+      <button type="submit">Login</button>
+      <div class="switch-text" style="text-align: center; font-size: 3.8vw;">
+  Don't have an account? <button type="button" onclick="toggleForm('register')" style="background: none; border: none; color: #1e90ff; text-decoration: none; cursor: pointer; font-size: 3.8vw; padding: 0; margin: 0;">Click here</button>
+</div>
+    </form>
+
+    <!-- Register Form -->
+<form id="registerForm" class="hidden" method="POST" action="/mobile" style="padding: 4vw;">
+  <input type="hidden" name="action" value="register" />
+  <h2 style="font-size: 5.5vw; margin-bottom: 4vw;">Register</h2>
+
+  <label style="font-size: 3.8vw;">Full Name</label>
+  <input type="text" name="full_name" required placeholder="Your Name" style="margin-bottom: 3vw;">
+
+  <label style="font-size: 3.8vw;">Email</label>
+  <input type="email" id="regEmail" name="email" required placeholder="you@example.com" style="margin-bottom: 2vw;">
+  <button type="button" onclick="sendRegisterOTP()" style="margin-bottom: 3vw;">Send OTP</button>
+
+  <p id="otpTimer" class="otp-timer hidden" style="margin-bottom: 2vw;"></p>
+  <div id="otpBlock" class="hidden">
+    <label style="font-size: 3.8vw;">Enter OTP</label>
+    <div class="otp-row" style="margin-bottom: 3vw;">
+      <input type="text" id="otpInput" placeholder="6-digit OTP">
+      <button type="button" onclick="verifyOTP()">Verify</button>
+    </div>
+  </div>
+
+  <label style="font-size: 3.8vw;">Mobile Number</label>
+  <input type="tel" name="contact" required placeholder="1234567890" style="margin-bottom: 3vw;">
+
+  <label style="font-size: 3.8vw;">Password</label>
+  <input type="password" name="password" required placeholder="Create password" style="margin-bottom: 3vw;">
+
+  <label style="font-size: 3.8vw;">Confirm Password</label>
+  <input type="password" name="confirm_password" required placeholder="Repeat password" style="margin-bottom: 4vw;">
+
+  <button type="submit" id="registerBtn" disabled style="cursor:not-allowed; margin-bottom: 3vw;">Register</button>
+
+  <div class="switch-text" style="text-align: center; font-size: 3.8vw;">
+    Already have an account? 
+    <button type="button" onclick="toggleForm('login')" style="background: none; border: none; color: #1e90ff; text-decoration: none; cursor: pointer; font-size: 3.8vw; padding: 0; margin: 0;">
+      Login
+    </button>
+  </div>
+</form>
+
+  <script>
+    let otpTimer;
+
+    function sendRegisterOTP() {
+      const email = document.getElementById('regEmail').value.trim();
+      const otpBtn = document.querySelector("button[onclick='sendRegisterOTP()']");
+      if (!email) return alert("Please enter your email.");
+
+      otpBtn.disabled = true;
+      otpBtn.textContent = "Sending...";
+      otpBtn.style.opacity = 0.5;
+      otpBtn.style.cursor = "not-allowed";
+
+      fetch("/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert("OTP sent.");
+          document.getElementById("otpBlock").classList.remove("hidden");
+          startTimer(otpBtn);
+        } else {
+          alert("Error: " + (data.message || "Failed to send OTP."));
+          resetOTPButton(otpBtn);
+        }
+      })
+      .catch(() => {
+        alert("Network error.");
+        resetOTPButton(otpBtn);
+      });
+    }
+
+    function startTimer(otpBtn) {
+      let seconds = 300;
+      const timer = document.getElementById("otpTimer");
+      timer.classList.remove("hidden");
+      otpTimer = setInterval(() => {
+        if (seconds <= 0) {
+          clearInterval(otpTimer);
+          timer.classList.add("hidden");
+          resetOTPButton(otpBtn);
+          return;
+        }
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        timer.textContent = `⏳ Wait ${m}:${s.toString().padStart(2, '0')} to resend.`;
+        seconds--;
+      }, 1000);
+    }
+
+    function resetOTPButton(otpBtn) {
+      otpBtn.disabled = false;
+      otpBtn.textContent = "Send OTP";
+      otpBtn.style.opacity = 1;
+      otpBtn.style.cursor = "pointer";
+    }
+
+    function verifyOTP() {
+      const otp = document.getElementById("otpInput").value.trim();
+      const otpInput = document.getElementById("otpInput");
+      const otpBox = document.getElementById("otpBlock");
+      const verifyBtn = otpBox.querySelector("button");
+      const otpTimerText = document.getElementById("otpTimer");
+
+      if (!otp) return alert("Enter OTP");
+
+      fetch("/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ otp })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.verified) {
+          alert("OTP Verified.");
+          if (otpTimer) clearInterval(otpTimer);
+          otpTimerText.classList.add("hidden");
+
+          const verifiedMsg = document.createElement("p");
+          verifiedMsg.textContent = "✅ OTP Verified";
+          verifiedMsg.style.color = "#22c55e";
+          verifiedMsg.style.fontWeight = "bold";
+          verifiedMsg.style.marginTop = "1vw";
+
+          verifyBtn.style.display = "none";
+          otpInput.setAttribute("readonly", true);
+          otpBox.appendChild(verifiedMsg);
+
+          const registerBtn = document.getElementById("registerBtn");
+          registerBtn.disabled = false;
+          registerBtn.style.cursor = "pointer";
+          registerBtn.style.opacity = "1";
+        } else {
+          alert("Invalid OTP.");
+        }
+      })
+      .catch(() => alert("Error verifying OTP."));
+    }
+
+    function toggleForm(form) {
+      document.getElementById('loginForm').classList.toggle('hidden', form === 'register');
+      document.getElementById('registerForm').classList.toggle('hidden', form === 'login');
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const params = new URLSearchParams(window.location.search);
+      const open = params.get("open");
+      if (open === "register") toggleForm("register");
+      else toggleForm("login");
+
+      document.getElementById("registerBtn").disabled = true;
+    });
+  </script>
+</body>
+</html>

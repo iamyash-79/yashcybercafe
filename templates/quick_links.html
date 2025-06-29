@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quick Links - Yash Cyber Cafe</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
   <style>
@@ -58,9 +59,21 @@
       color: #1de9b6;
     }
 
+    ul {
+      margin-left: 1.5rem;
+      margin-bottom: 1.2rem;
+    }
+
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     @media (max-width: 600px) {
@@ -78,11 +91,13 @@
     }
   </style>
 </head>
+
 <body>
 
   <div class="container">
+
     <div id="shipping" class="section active">
-      <h2>📦 Shiiping and Delivery</h2>
+      <h2>📦 Shipping and Delivery</h2>
       <p>All orders are processed within 1-2 business days (excluding weekends and holidays) after receiving your order confirmation email.</p>
     </div>
 
@@ -106,7 +121,63 @@
       <h2>🔒 Privacy Policy</h2>
       <p>We respect your privacy. Any data you share with us is strictly confidential and used only for service purposes. <strong>No third-party sharing</strong> is permitted.</p>
     </div>
-  </div>
+
+    <div id="about" class="section">
+      <h2>ℹ️ About Us</h2>
+      <p>Welcome to <strong>Yash Cyber Cafe</strong> – your one-stop destination for all your digital, printing, and online service needs. Whether you're looking to print important documents, access the internet, or complete government and online tasks, we’ve got you covered with fast, reliable, and affordable services.</p>
+
+      <br>
+
+      <p>At Yash Cyber Cafe, we provide:</p>
+      <ul>
+        <li><strong>Printing & Scanning Services</strong> – High-quality prints for documents, photos, projects, and more.</li>
+        <li><strong>Online Services</strong> – From form filling, bill payments, and online registrations to exam applications and more.</li>
+        <li><strong>Computer Access</strong> – Smooth and secure internet browsing for study, work, or leisure.</li>
+        <li><strong>Tech Support</strong> – Friendly assistance to help you complete tasks easily and efficiently.</li>
+      </ul>
+
+      <p>Customer satisfaction is at the heart of everything we do. With a commitment to accuracy, speed, and service, Yash Cyber Cafe is your trusted digital partner in town.</p>
+
+      <br>
+
+      <p><strong>Privacy Notice:</strong> We respect your privacy. Any data you share with us is strictly confidential and used only for service purposes. <strong>No third-party sharing</strong> is permitted.</p>
+    </div>
+
+    <div id="contact" class="section">
+  <h2>📞 Contact Us</h2>
+
+  <!-- 📍 Clickable, styled address block -->
+  <p style="margin: 0 0 16px;">
+    <a href="https://www.google.com/maps?q=Yash+Cyber+Cafe+Nagri+Dhamtari+Chhattisgarh+493778"
+       target="_blank"
+       style="text-decoration: none; color: inherit; display: inline-flex; align-items: center; gap: 8px;">
+      <img src="https://img.icons8.com/ios-filled/20/ffffff/marker.png" alt="Address" />
+      <span><strong>Yash Cyber Cafe, Nagri, Dist.- Dhamtari, Chhattisgarh - 493778</strong></span>
+    </a>
+  </p>
+
+  <p>If you have any questions or need assistance, feel free to reach out to us through the following contact options:</p>
+
+  <p>
+  <a href="tel:+917987190554"
+     style="text-decoration: none; color: #2196F3; display: inline-flex; align-items: center; gap: 8px;">
+    <img src="https://img.icons8.com/ios-filled/20/ffffff/phone.png" alt="Call" />
+    Call Us
+  </a>
+</p>
+
+<p>
+  <a href="https://wa.me/918120709649" target="_blank"
+     style="text-decoration: none; color: #2196F3; display: inline-flex; align-items: center; gap: 8px;">
+    <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/whatsapp.svg"
+         alt="WhatsApp"
+         style="width: 20px; filter: invert(1);" />
+    WhatsApp
+  </a>
+</p>
+
+  <p>You can contact us during working hours: <strong>9:00 AM to 8:00 PM</strong>, Monday to Saturday.</p>
+</div>
 
   <!-- Section Switching Script -->
   <script>
@@ -122,7 +193,7 @@
 
     window.addEventListener('load', () => {
       const hash = window.location.hash.substring(1);
-      showSection(hash || 'track');
+      showSection(hash || 'shipping');
     });
 
     window.addEventListener('hashchange', () => {
@@ -132,4 +203,5 @@
   </script>
 
 </body>
+
 </html>
