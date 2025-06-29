@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" x-data="serviceApp()">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Services - {{ full_name }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .glass {
+      backdrop-filter: blur(16px);
+      background: rgba(15, 23, 42, 0.8);
+    }
+  </style>
+</head>
+<body class="h-screen bg-[#0f172a] text-cyan-100 overflow-hidden">
+<div class="flex flex-col md:flex-row h-full">
+  <!-- Sidebar -->
+  <div class="w-full md:w-56 md:h-full z-40 fixed md:relative top-0 left-0">
+    {% set current_page = 'services' %}
+    {% include 'sidebar.html' %}
+  </div>
+
+  <!-- Main Content -->
+  <main class="flex flex-col md:ml-38 w-full h-full">
+    <!-- Sticky Tabs -->
+    <div class="sticky top-0 z-30 bg-[#0f172a] border-b border-cyan-700 pt-20">
+      <div class="flex space-x-4 px-4 py-2 text-sm overflow-x-auto">
+        <a href="/products" class="border-b-2 border-transparent text-gray-400 hover:text-cyan-400 hover:border-cyan-400 whitespace-nowrap">products</a>
+        <a href="/services" class="font-semibold border-b-2 border-cyan-500 text-cyan-400 whitespace-nowrap">Services</a>
+      </div>
+
+      <!-- Flash Messages -->
+      <div class="px-4 py-2">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="mb-2 space-y-2">
+              {% for category, message in messages %}
+                <div class="p-2 rounded text-white 
+                  {% if category == 'success' %}bg-green-600{% elif category == 'error' %}bg-red-600{% else %}bg-blue-600{% endif %}">
+                  {{ message }}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+
+    <!-- Services Grid -->
+    <div class="flex-1 overflow-y-auto px-2 py-4">
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {% for service in services %}
+        <div class="bg-[#1e293b] text-cyan-100 border border-cyan-800 rounded-lg p-3 text-xs shadow-md flex flex-col items-center">
+          <!-- Image show -->
+          {% if service.image_url %}
+            <img src="{{ service.image_url }}" alt="{{ service.name }}" class="w-full h-24 object-cover rounded mb-2" />
+          {% else %}
+            <div class="w-full h-24 bg-cyan-800 rounded mb-2 flex items-center justify-center text-xs text-cyan-400">No Image</div>
+          {% endif %}
+
+          <h2 class="font-bold text-center truncate">{{ service.name }}</h2>
+          <p class="text-center my-1">
+            {% if service.discount_price %}
+              <span class="line-through text-gray-400">₹{{ service.price }}</span>
+              <span class="text-green-400 font-bold ml-1">₹{{ service.discount_price }}</span>
+            {% else %}
+              ₹{{ service.price }}
+            {% endif %}
+          </p>
+          <p class="text-[10px] text-center text-gray-400 truncate">{{ service.description }}</p>
+          <div class="flex space-x-1 mt-2 w-full">
+            <form method="POST" action="/delete_service/{{ service.id }}" onsubmit="return confirm('Delete this service?')" class="w-1/2">
+              <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white py-[2px] rounded text-[10px]">❌</button>
+            </form>
+            <button 
+              type="button"
+              class="w-1/2 bg-cyan-700 hover:bg-cyan-800 text-white py-[2px] rounded text-[10px]"
+              @click='openEditModal({{ service | tojson | safe }})'
+            >✏️</button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Floating Add Button -->
+    <button @click="showAddModal = true" class="fixed bottom-14 right-4 z-50 bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-3 rounded-full shadow-xl text-sm">
+      + Add Service
+    </button>
+  </main>
+</div>
+
+<!-- Add Modal -->
+<div x-show="showAddModal" x-cloak class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+  <div class="glass border border-cyan-400 p-6 rounded-2xl shadow-2xl max-w-md w-full text-cyan-100 relative">
+    <button @click="showAddModal = false" class="absolute top-2 right-3 text-cyan-400 hover:text-red-400 text-xl">✖</button>
+    <h2 class="text-2xl font-bold mb-4 text-center text-cyan-300">Add New Service</h2>
+    <form action="/services" method="POST" enctype="multipart/form-data" class="space-y-4">
+      <input name="name" placeholder="Name" required class="w-full px-3 py-2 rounded bg-[#0f172a] border border-cyan-500 text-cyan-100 placeholder-cyan-400" />
+      <input name="price" type="number" placeholder="Price" required class="w-full px-3 py-2 rounded bg-[#0f172a] border border-cyan-500 text-cyan-100 placeholder-cyan-400" />
+      <input name="discount_price" type="number" placeholder="Discount Price" class="w-full px-3 py-2 rounded bg-[#0f172a] border border-cyan-500 text-cyan-100 placeholder-cyan-400" />
+      <textarea name="description" placeholder="Description" class="w-full px-3 py-2 rounded bg-[#0f172a] border border-cyan-500 text-cyan-100 placeholder-cyan-400"></textarea>
+      <label class="block text-cyan-300 text-sm mb-1">Upload Image</label>
+      <input name="image" type="file" accept="image/*" class="w-full text-cyan-100" />
+      <div class="flex justify-end gap-2">
+        <button type="button" @click="showAddModal = false" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">Cancel</button>
+        <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div x-show="showEditModal" x-cloak class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+  <div class="glass border border-cyan-400 p-6 rounded-2xl shadow-2xl max-w-md w-full text-cyan-100 relative">
+    <button @click="showEditModal = false" class="absolute top-2 right-3 text-cyan-400 hover:text-red-400 text-xl">✖</button>
+    <h2 class="text-2xl font-bold mb-4 text-center text-cyan-300">Edit Service</h2>
+    <form :action="`/edit_service/${editItem.id}`" method="POST" enctype="multipart/form-data" class="space-y-4">
+      <input name="name" x-model="editItem.name" required class="w-full px-3 py-2 rounded bg-[#0f172a] border border-cyan-500 text-cyan-100 placeholder-cyan-400" />
+      <input name="price" type="number" x-model.number="editItem.price" required class="w-full px-3 py-2 rounded bg-[#0f172a] border border-cyan-500 text-cyan-100 placeholder-cyan-400" />
+      <input name="discount_price" type="number" x-model.number="editItem.discount_price" class="w-full px-3 py-2 rounded bg-[#0f172a] border border-cyan-500 text-cyan-100 placeholder-cyan-400" />
+      <textarea name="description" x-model="editItem.description" class="w-full px-3 py-2 rounded bg-[#0f172a] border border-cyan-500 text-cyan-100 placeholder-cyan-400"></textarea>
+      <template x-if="editItem.image_url">
+        <img :src="editItem.image_url" alt="Current Image" class="w-full h-24 object-cover rounded mb-2" />
+      </template>
+      <label class="block text-cyan-300 text-sm mb-1">Change Image</label>
+      <input name="image" type="file" accept="image/*" class="w-full text-cyan-100" />
+      <div class="flex justify-end gap-2">
+        <button type="button" @click="showEditModal = false" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">Cancel</button>
+        <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded">Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function serviceApp() {
+    return {
+      showAddModal: false,
+      showEditModal: false,
+      editItem: {
+        id: null,
+        name: '',
+        price: 0,
+        discount_price: '',
+        description: '',
+        image_url: ''
+      },
+      openEditModal(item) {
+        this.editItem = {
+          id: item.id || null,
+          name: item.name || '',
+          price: item.price || 0,
+          discount_price: item.discount_price || '',
+          description: item.description || '',
+          image_url: item.image_url || ''
+        };
+        this.showEditModal = true;
+      }
+    };
+  }
+</script>
+</body>
+</html>
