@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, g, redirect, session, url_for, flash, jsonify, current_app
-import os, json, random, string, smtplib, ssl, time, razorpay, mysql.connector
+import sqlite3, os, json, random, string, smtplib, ssl, time, razorpay
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
@@ -8,28 +8,21 @@ from flask_login import LoginManager, current_user, login_required, login_user, 
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
+app.permanent_session_lifetime = timedelta(days=100)
 
 client = razorpay.Client(auth=("rzp_live_8teFtytXqXhxwa", "wv24XQhmouaxsoyPJ2F2hAX4"))
 
 APP_NAME = "Yash Cyber Cafe"
 EMAIL_ADDRESS = "yashcybercafeofficial@gmail.com"
 EMAIL_PASSWORD = "jgwujcylyefeaefz"
-UPLOAD_FOLDER = 'static/uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-def get_mysql_connection():
-    return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="Yashwant@7987",
-        database="cybercafe_app"
-    )
 
 def generate_random_otp(length=6):
+    import random
     return ''.join(random.choices('0123456789', k=length))
 
 def send_otp_to_email(email, otp):
+    import smtplib, ssl
+
     subject = f"{APP_NAME} - OTP Verification"
     body = f"""Hello,
 
@@ -37,10 +30,13 @@ Your OTP for {APP_NAME} is: {otp}
 
 This code is valid for 5 minutes. Please do not share it with anyone.
 
-Regards,  
+Regards,
 {APP_NAME} Team
 """
+
+    # Add custom From header (may be ignored by Gmail)
     message = f"From: {APP_NAME} <{EMAIL_ADDRESS}>\nSubject: {subject}\n\n{body}"
+
     try:
         context = ssl.create_default_context()
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
@@ -52,6 +48,8 @@ Regards,
         return False
 
 def send_user_welcome_email(email, name):
+    import smtplib, ssl
+
     subject = f"Welcome to {APP_NAME}!"
     body = f"""Hello {name},
 
@@ -65,10 +63,12 @@ If you have any questions or need help, feel free to reach out to our support te
 
 We're excited to have you on board!
 
-Warm regards,  
+Warm regards,
 {APP_NAME} Team
 """
+
     message = f"Subject: {subject}\n\n{body}"
+
     try:
         context = ssl.create_default_context()
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
@@ -80,6 +80,8 @@ Warm regards,
         return False
 
 def send_admin_welcome_email(email, name, password):
+    import smtplib, ssl
+
     subject = f"{APP_NAME} - Admin Account Created"
     body = f"""Hi {name},
 
@@ -92,10 +94,13 @@ Welcome to {APP_NAME}! Your admin account has been created successfully.
 
 If you did not request this account, please contact the system owner.
 
-Regards,  
+Regards,
 {APP_NAME} Team
 """
+
+    # Include 'From' properly in the message
     message = f"From: {APP_NAME} <{EMAIL_ADDRESS}>\nTo: {email}\nSubject: {subject}\n\n{body}"
+
     try:
         context = ssl.create_default_context()
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
@@ -106,6 +111,38 @@ Regards,
     except Exception as e:
         print("❌ Failed to send admin welcome email:", e)
         return False
+
+def get_db():
+    if 'db' not in g:
+        g.db = sqlite3.connect("users.db", timeout=10)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+@app.teardown_appcontext
+def close_db(error):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
+
+def get_users_db():
+    conn = sqlite3.connect("users.db", timeout=10)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def get_products_db():
+    conn = sqlite3.connect('products.db', timeout=10)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def get_services_db():
+    conn = sqlite3.connect("services.db", timeout=10)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def get_orders_db():
+    conn = sqlite3.connect("orders.db", timeout=10)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -121,18 +158,10 @@ def utc_to_local(utc_str):
 @app.template_filter('datetimeformat')
 def format_datetime(value):
     try:
-        if isinstance(value, str):
-            utc = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
-        elif isinstance(value, datetime):
-            utc = value
-        else:
-            return value  # Unknown format
-
-        # Convert UTC to IST properly
-        ist = utc.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("Asia/Kolkata"))
-        return ist.strftime("%d %b %Y, %I:%M %p")
-    except Exception as e:
-        print("Date format error:", e)
+        utc = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+        ist = utc + timedelta(hours=5, minutes=30)
+        return ist.strftime("%d/%m/%Y %I:%M %p")
+    except Exception:
         return value
 
 @app.context_processor
@@ -148,29 +177,27 @@ def get_user():
     if not user_email:
         return None
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("""
+    conn = get_db()
+    row = conn.execute(
+        """
         SELECT id, full_name, email, profile_image, role, contact, gender_id,
                security_question, security_answer
         FROM users
-        WHERE email = %s
-    """, (user_email,))
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
+        WHERE email = ?
+        """, (user_email,)
+    ).fetchone()
 
-    return row if row else None
+    if row:
+        return dict(row)
+
+    return None
 
 def handle_login(expected_role):
     email = request.form.get("email")
     password = request.form.get("password")
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-    user = cursor.fetchone()
-    cursor.close()
+    conn = get_users_db()
+    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     conn.close()
 
     if user and check_password_hash(user["password"], password):
@@ -186,17 +213,18 @@ def handle_login(expected_role):
     return redirect(request.path)
 
 def get_owner_id():
-    conn = get_mysql_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM users WHERE role = 'owner' LIMIT 1")
+    conn = get_users_db()
+    cursor = conn.execute("SELECT id FROM users WHERE role = 'owner' LIMIT 1")
     result = cursor.fetchone()
-    cursor.close()
     conn.close()
-    return result[0] if result else None
+    return result['id'] if result else None
 
-@app.route("/", methods=["GET", "POST"])
+@app.route('/', methods=['GET', 'POST'])
 def login_user():
-    if request.method == "POST":
+    if 'user_id' in session:
+        return redirect(url_for('home'))  # ✅ Already logged in
+
+    if request.method == 'POST':
         email = request.form.get("email", "").strip()
         password = request.form.get("password", "").strip()
 
@@ -204,57 +232,58 @@ def login_user():
             flash("Email and password are required.", "login_error")
             return redirect(url_for("login_user", open_login="true"))
 
-        conn = get_mysql_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-        user = cur.fetchone()
+        conn = sqlite3.connect("users.db")
+        conn.row_factory = sqlite3.Row
+        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
 
         if not user:
-            cur.close()
             conn.close()
             flash("Invalid email or password", "login_error")
             return redirect(url_for("login_user", open_login="true"))
 
+        # Validate passwords
         is_correct_password = check_password_hash(user["password"], password)
-        temp_pass = user.get("temp_password")
-        usage = user.get("temp_password_uses", 0)
+
+        temp_pass = user["temp_password"] if "temp_password" in user.keys() else None
+        usage = user["temp_password_uses"] if "temp_password_uses" in user.keys() else 0
         is_temp_password = temp_pass == password and usage < 2 if temp_pass else False
 
         if not is_correct_password and not is_temp_password:
-            cur.close()
             conn.close()
             flash("Invalid email or password", "login_error")
             return redirect(url_for("login_user", open_login="true"))
 
-        db_role = user.get("role", "user")
+        # Prevent admin/owner login via this route
+        db_role = user["role"] if "role" in user.keys() else "user"
         if db_role in ("admin", "owner"):
-            cur.close()
             conn.close()
             flash("Please login from admin panel.", "login_error")
             return redirect(url_for("login_user", open_login="true"))
 
+        # Handle temp password usage
         if is_temp_password:
             usage += 1
             if usage >= 2:
-                cur.execute(
-                    "UPDATE users SET temp_password = NULL, temp_password_uses = 0 WHERE id = %s",
+                conn.execute(
+                    "UPDATE users SET temp_password = NULL, temp_password_uses = 0 WHERE id = ?",
                     (user["id"],)
                 )
             else:
-                cur.execute(
-                    "UPDATE users SET temp_password_uses = %s WHERE id = %s",
+                conn.execute(
+                    "UPDATE users SET temp_password_uses = ? WHERE id = ?",
                     (usage, user["id"])
                 )
             conn.commit()
 
-        cur.close()
         conn.close()
 
+        # Set session
+        session.permanent = True
         session["user_id"] = user["id"]
         session["user"] = {
             "email": user["email"],
             "role": db_role,
-            "name": user.get("full_name", "")
+            "name": user["full_name"] if "full_name" in user.keys() else ""
         }
 
         if is_temp_password:
@@ -263,38 +292,50 @@ def login_user():
 
         return redirect(url_for("home"))
 
-    # --- GET Method: Load products and services ---
+    # GET request — show login form with product & service data
     owner_id = get_owner_id()
-    conn = get_mysql_connection()
 
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM products WHERE admin_id = %s", (owner_id,))
-    products_items = cursor.fetchall()
-    cursor.close()
-
-    parsed_products = []
-    for item in products_items:
-        try:
-            images = json.loads(item.get('images', '[]'))
-            item['image_url'] = images[0] if images else None
-        except Exception:
-            item['image_url'] = None
-        parsed_products.append(item)
-
-    cursor2 = conn.cursor(dictionary=True)
-    cursor2.execute("SELECT * FROM services WHERE admin_id = %s ORDER BY id DESC", (owner_id,))
-    service_items = cursor2.fetchall()
-    cursor2.close()
+    # Fetch product data listed by owner
+    conn = get_products_db()
+    conn.row_factory = sqlite3.Row
+    product_items = conn.execute(
+        "SELECT * FROM product WHERE admin_id = ?", (owner_id,)
+    ).fetchall()
     conn.close()
 
-    return render_template("login_user.html", products_items=parsed_products, service_items=service_items)
+    parsed_products = []
+    for item in product_items:
+        product_dict = dict(item)
+        try:
+            images = json.loads(product_dict.get('images', '[]'))
+            product_dict['image_url'] = images[0] if images else None
+        except Exception:
+            product_dict['image_url'] = None
+        parsed_products.append(product_dict)
+
+    # Fetch service data listed by owner
+    conn2 = get_services_db()
+    conn2.row_factory = sqlite3.Row
+    service_items = conn2.execute(
+        "SELECT * FROM services WHERE admin_id = ? ORDER BY id DESC", (owner_id,)
+    ).fetchall()
+    conn2.close()
+
+    services = [dict(row) for row in service_items]
+
+    return render_template('login_user.html', product_items=parsed_products, service_items=services)
 
 @app.route("/mobile", methods=["GET", "POST"])
 def mobile_auth():
+    # ✅ Auto-redirect if already logged in
+    if "user_id" in session:
+        return redirect(url_for("home"))
+
     if request.method == "POST":
         action = request.form.get("action")
 
         if action == "login":
+            # --- Login logic ---
             email = request.form.get("email", "").strip()
             password = request.form.get("password", "").strip()
 
@@ -302,10 +343,9 @@ def mobile_auth():
                 flash("Email and password are required.", "login_error")
                 return redirect("/mobile")
 
-            conn = get_mysql_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-            user = cursor.fetchone()
+            conn = sqlite3.connect("users.db")
+            conn.row_factory = sqlite3.Row
+            user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
 
             if not user:
                 conn.close()
@@ -313,8 +353,8 @@ def mobile_auth():
                 return redirect("/mobile")
 
             is_correct_password = check_password_hash(user["password"], password)
-            temp_pass = user.get("temp_password")
-            usage = user.get("temp_password_uses", 0)
+            temp_pass = user["temp_password"] if "temp_password" in user.keys() else None
+            usage = user["temp_password_uses"] if "temp_password_uses" in user.keys() else 0
             is_temp_password = temp_pass == password and usage < 2 if temp_pass else False
 
             if not is_correct_password and not is_temp_password:
@@ -322,7 +362,7 @@ def mobile_auth():
                 flash("Invalid email or password", "login_error")
                 return redirect("/mobile")
 
-            db_role = user.get("role", "user")
+            db_role = user["role"] if "role" in user.keys() else "user"
             if db_role in ("admin", "owner"):
                 conn.close()
                 flash("Please login from admin panel.", "login_error")
@@ -331,9 +371,15 @@ def mobile_auth():
             if is_temp_password:
                 usage += 1
                 if usage >= 2:
-                    cursor.execute("UPDATE users SET temp_password = NULL, temp_password_uses = 0 WHERE id = %s", (user["id"],))
+                    conn.execute(
+                        "UPDATE users SET temp_password = NULL, temp_password_uses = 0 WHERE id = ?",
+                        (user["id"],)
+                    )
                 else:
-                    cursor.execute("UPDATE users SET temp_password_uses = %s WHERE id = %s", (usage, user["id"]))
+                    conn.execute(
+                        "UPDATE users SET temp_password_uses = ? WHERE id = ?",
+                        (usage, user["id"])
+                    )
                 conn.commit()
 
             conn.close()
@@ -342,7 +388,7 @@ def mobile_auth():
             session["user"] = {
                 "email": user["email"],
                 "role": db_role,
-                "name": user.get("full_name", "")
+                "name": user["full_name"] if "full_name" in user.keys() else ""
             }
 
             if is_temp_password:
@@ -368,17 +414,17 @@ def mobile_auth():
 
             hashed_password = generate_password_hash(password)
 
-            conn = get_mysql_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-            existing = cursor.fetchone()
+            conn = sqlite3.connect("users.db")
+            conn.row_factory = sqlite3.Row
+            existing = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+
             if existing:
                 flash("Email already registered.", "register_error")
                 conn.close()
                 return redirect("/mobile?open=register")
 
-            cursor.execute(
-                "INSERT INTO users (full_name, email, contact, password, role) VALUES (%s, %s, %s, %s, %s)",
+            conn.execute(
+                "INSERT INTO users (full_name, email, contact, password, role) VALUES (?, ?, ?, ?, ?)",
                 (full_name, email, contact, hashed_password, "user")
             )
             conn.commit()
@@ -387,6 +433,7 @@ def mobile_auth():
             flash("Registration successful! Please login.", "register_success")
             return redirect("/mobile?open=login")
 
+    # GET request (and not logged in)
     return render_template("mobile.html")
 
 @app.route("/quick-links")
@@ -395,168 +442,123 @@ def quick_links():
 
 @app.route("/home")
 def home():
-    user = session.get("user")
+    user = get_user()
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id, name, price, discount_price, images FROM products")
-    rows = cursor.fetchall()
-    conn.close()
+    conn = get_products_db()
 
-    products_items = []
-    for row in rows:
+    # Fetch product items
+    cursor = conn.execute("SELECT id, name, price, discount_price, images FROM product")
+    product_items = []
+    for row in cursor.fetchall():
         try:
             images = json.loads(row["images"]) if row["images"] else []
         except Exception:
             images = []
 
+        # Safe discount price conversion
         try:
             discount_price = float(row['discount_price']) if row['discount_price'] not in (None, '', 'None') else 0.0
         except Exception:
             discount_price = 0.0
 
-        products_items.append({
+        product_items.append({
             'id': row['id'],
             'name': row['name'],
-            'price': float(row['price']),
+            'price': float(row['price']),  # Ensure price is a float
             'discount_price': discount_price,
             'images': images
         })
 
-    return render_template("home.html", user=user, full_name=user.get("full_name") if user else None, products_items=products_items)
-
-@app.route('/cart/<int:products_id>')
-def cart(products_id):
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute('SELECT * FROM products WHERE id = %s', (products_id,))
-    products = cursor.fetchone()
     conn.close()
 
-    if not products:
-        flash("products not found.", "error")
+    return render_template(
+        "home.html",
+        user=user,
+        full_name=user["full_name"] if user else None,
+        product_items=product_items
+    )
+
+
+@app.route('/cart/<int:product_id>')
+def cart(product_id):
+    conn = get_products_db()
+    product = conn.execute('SELECT * FROM product WHERE id = ?', (product_id,)).fetchone()
+    conn.close()
+
+    if not product:
+        flash("Product not found.", "error")
         return redirect(url_for('home'))
 
+    # Safely load images
     try:
-        images = json.loads(products['images']) if products['images'] else []
+        images = json.loads(product['images']) if product['images'] else []
     except Exception:
         images = []
 
-    products_data = {
-        'id': products['id'],
-        'name': products['name'],
-        'description': products['description'],
-        'price': float(products['price']),
-        'discount_price': float(products['discount_price']) if products['discount_price'] not in (None, '', 'None') else None,
+    # Prepare product data
+    product_data = {
+        'id': product['id'],
+        'name': product['name'],
+        'description': product['description'],
+        'price': float(product['price']),  # Ensure price is float for calculations
+        'discount_price': float(product['discount_price']) if product['discount_price'] not in (None, '', 'None') else None,
         'images': images
     }
 
-    return render_template('cart.html', products=products_data)
+    return render_template('cart.html', product=product_data)
 
 @app.route("/my_orders")
 def my_orders():
-    user = session.get("user")
+    user = get_user()
 
     if not user or user.get("role") != "user":
         flash("Please log in to view your orders.", "login_error")
+
         user_agent = request.headers.get('User-Agent', '').lower()
         is_mobile = "mobi" in user_agent or "android" in user_agent or "iphone" in user_agent
+
         if is_mobile:
             return redirect("/mobile")
         else:
             return redirect(url_for("login_user", open_login="true"))
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("""
-        SELECT id, item_name, quantity, status, address1, address2, city, pincode, 
+    conn_orders = get_orders_db()
+    cursor = conn_orders.execute(
+        """
+        SELECT id, item_name, quantity, status, address1, address2, city, pincode,
                created_at, is_paid, amount, image
-        FROM orders 
-        WHERE user_email = %s
+        FROM orders
+        WHERE user_email = ?
         ORDER BY id DESC
-    """, (user['email'],))
+        """,
+        (user['email'],)
+    )
+
     rows = cursor.fetchall()
-    conn.close()
+    conn_orders.close()
 
     my_orders = []
     for row in rows:
+        order = dict(row)
         try:
-            row["created_at_obj"] = datetime.strptime(row["created_at"], "%d %b %Y, %I:%M %p")
+            # Optional: parse datetime
+            order["created_at_obj"] = datetime.strptime(order["created_at"], "%d %b %Y, %I:%M %p")
         except (ValueError, TypeError):
-            row["created_at_obj"] = row["created_at"]
-        my_orders.append(row)
-
-    return render_template("my_orders.html", user=user, full_name=user.get("full_name", ""), my_orders=my_orders, razorpay_key="rzp_live_8teFtytXqXhxwa")
-
-@app.route("/my_orders2/<int:order_id>")
-def my_orders2(order_id):
-    user = get_user()
-
-    if not user or user.get("role") != "user":
-        flash("Please log in to view your orders.", "login_error")
-        return redirect(url_for("login_user", open_login="true"))
-
-    # ✅ Get order info from MySQL
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-
-    cursor.execute(
-        """
-        SELECT id, item_id, item_name, quantity, amount, status, image,
-               address1, address2, city, pincode,
-               created_at, accepted_at, cancelled_at, delivered_at
-        FROM orders
-        WHERE id = %s AND user_email = %s
-        """,
-        (order_id, user['email'])
-    )
-    order = cursor.fetchone()
-
-    if not order:
-        conn.close()
-        flash("Order not found.", "error")
-        return redirect(url_for("my_orders"))
-
-    # ✅ Get products info from MySQL (same DB now)
-    cursor.execute(
-        "SELECT id AS products_id, images FROM products WHERE id = %s",
-        (order['item_id'],)
-    )
-    products = cursor.fetchone()
-
-    order['products_id'] = products['products_id'] if products else None
-    order['products_image'] = products['images'] if products else None
-
-    conn.close()
-
-    # ✅ Convert string date fields to datetime objects
-    date_format = "%d %b %Y, %I:%M %p"
-    date_fields = ['created_at', 'accepted_at', 'cancelled_at', 'delivered_at']
-
-    for field in date_fields:
-        raw_value = order.get(field)
-        if raw_value and isinstance(raw_value, str):
-            try:
-                order[field] = datetime.strptime(raw_value, date_format)
-            except Exception:
-                order[field] = None
-        elif isinstance(raw_value, datetime):
-            order[field] = raw_value
-        else:
-            order[field] = None
+            order["created_at_obj"] = order["created_at"]
+        my_orders.append(order)
 
     return render_template(
-        "my_orders2.html",
+        "my_orders.html",
         user=user,
         full_name=user.get("full_name", ""),
-        order=order
+        my_orders=my_orders,
+        razorpay_key="rzp_live_8teFtytXqXhxwa"
     )
 
 @app.route("/create_razorpay_order/<int:order_id>")
 def create_razorpay_order(order_id):
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT amount FROM orders WHERE id = %s", (order_id,))
+    conn = get_orders_db()  # ✅ Fix: Use correct DB
+    cursor = conn.execute("SELECT amount FROM orders WHERE id = ?", (order_id,))
     order = cursor.fetchone()
     conn.close()
 
@@ -576,19 +578,20 @@ def create_razorpay_order(order_id):
         "amount": amount_paise
     })
 
+
 @app.route("/payment_success", methods=["POST"])
 def payment_success():
     data = request.get_json()
     order_id = data.get("order_id")
 
+    # Get current datetime in required format
     accepted_at = datetime.now().strftime("%d %b %Y, %I:%M %p")
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE orders 
-        SET is_paid = 1, status = 'accepted', accepted_at = %s 
-        WHERE id = %s
+    conn = get_orders_db()
+    conn.execute("""
+        UPDATE orders
+        SET is_paid = 1, status = 'accepted', accepted_at = ?
+        WHERE id = ?
     """, (accepted_at, order_id))
     conn.commit()
     conn.close()
@@ -597,11 +600,12 @@ def payment_success():
 
 @app.route('/submit_order/<int:item_id>', methods=['POST'])
 def submit_order(item_id):
-    user = session.get("user")
+    user = get_user()
     if not user:
         flash("Login required to submit an order", "login_error")
         return redirect(url_for("login_user", open_login="true"))
 
+    # Get form data safely
     name = request.form.get('name', '').strip()
     contact = request.form.get('contact', '').strip()
     email = request.form.get('email', '').strip()
@@ -623,11 +627,12 @@ def submit_order(item_id):
         flash("Quantity and amount must be greater than zero.", "error")
         return redirect(request.referrer or url_for('home'))
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id, name, images, admin_id FROM products WHERE id = %s", (item_id,))
-    item = cursor.fetchone()
-    conn.close()
+    # Get product info (also fetch admin_id here 👇)
+    conn_products = get_products_db()
+    item = conn_products.execute(
+        "SELECT id, name, images, admin_id FROM product WHERE id = ?", (item_id,)
+    ).fetchone()
+    conn_products.close()
 
     if not item:
         flash("Item not found.", "error")
@@ -639,31 +644,105 @@ def submit_order(item_id):
     except Exception:
         image = 'default.jpg'
 
-    # ✅ Use MySQL-compatible datetime format
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    created_at = datetime.now().strftime("%d %b %Y, %I:%M %p")
     user_id = user.get('id')
-    admin_id = item['admin_id']
+    admin_id = item['admin_id']  # 👈 fetched from product
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
+    # Save order to database (added admin_id)
+    conn_orders = get_orders_db()
+    conn_orders.execute("""
         INSERT INTO orders (
             item_id, item_name, quantity, amount, status,
             address1, address2, city, pincode, order_date,
             user_id, user_name, user_contact, user_email, image,
-            created_at, admin_id
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            created_at, admin_id  -- 👈 added here
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         item['id'], item['name'], quantity, amount, 'pending',
         address1, address2, city, pincode, created_at,
         user_id, name, contact, email, image,
-        created_at, admin_id
+        created_at, admin_id  # 👈 added here
     ))
-    conn.commit()
-    conn.close()
+    conn_orders.commit()
+    conn_orders.close()
 
     flash('Order submitted successfully!', 'success')
     return redirect(url_for('my_orders'))
+
+@app.route("/my_orders2/<int:order_id>")
+def my_orders2(order_id):
+    user = get_user()
+
+    if not user or user.get("role") != "user":
+        flash("Please log in to view your orders.", "login_error")
+        return redirect(url_for("login_user", open_login="true"))
+
+    # Get order info from orders.db
+    conn_orders = get_orders_db()
+    conn_orders.row_factory = sqlite3.Row
+    cursor = conn_orders.execute(
+        """
+        SELECT id, item_id, item_name, quantity, amount, status, image,
+               address1, address2, city, pincode,
+               created_at, accepted_at, cancelled_at, delivered_at
+        FROM orders
+        WHERE id = ? AND user_email = ?
+        """,
+        (order_id, user['email'])
+    )
+    order = cursor.fetchone()
+    conn_orders.close()
+
+    if not order:
+        flash("Order not found.", "error")
+        return redirect(url_for("my_orders"))
+
+    order = dict(order)
+
+    # Connect to products.db and fetch product info using item_id
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    product_db_path = os.path.join(BASE_DIR, "products.db")
+
+    if not os.path.exists(product_db_path):
+        flash(f"Product database not found at {product_db_path}", "error")
+        order['product_id'] = None
+        order['product_image'] = None
+    else:
+        conn_products = sqlite3.connect(product_db_path)
+        conn_products.row_factory = sqlite3.Row
+
+        cursor_p = conn_products.execute(
+            "SELECT id AS product_id, images FROM product WHERE id = ?",
+            (order['item_id'],)
+        )
+        product = cursor_p.fetchone()
+        conn_products.close()
+
+        if product:
+            order['product_id'] = product['product_id']
+            order['product_image'] = product['images']
+        else:
+            order['product_id'] = None
+            order['product_image'] = None
+
+    # ✅ Parse date strings using correct format from submit_order()
+    date_format = "%d %b %Y, %I:%M %p"  # e.g., 25 Jun 2025, 03:45 PM
+    date_fields = ['created_at', 'accepted_at', 'cancelled_at', 'delivered_at']
+
+    for field in date_fields:
+        raw_value = order.get(field)
+        if raw_value:
+            try:
+                order[field] = datetime.strptime(raw_value, date_format)
+            except Exception:
+                order[field] = None
+
+    return render_template(
+        "my_orders2.html",
+        user=user,
+        full_name=user.get("full_name", ""),
+        order=order
+    )
 
 @app.route("/orders")
 def orders():
@@ -673,37 +752,30 @@ def orders():
         return redirect(url_for("login_user"))
 
     status_filter = request.args.get("status")
-    date_filter = request.args.get("date")  # format: YYYY-MM-DD
+    date_filter = request.args.get("date")
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-
+    conn = get_orders_db()
     query = "SELECT * FROM orders WHERE 1=1"
     params = []
 
     if user.get('role') == 'admin':
-        query += " AND admin_id = %s"
-        params.append(user.get('id'))
-    # Owner sees all orders — no admin_id filter
+        query += " AND admin_id = ?"
+        params.append(user.get('id'))  # Filter orders only by this admin's products
+
+    # Owner sees all orders — no need to filter
 
     if status_filter:
-        query += " AND status = %s"
+        query += " AND status = ?"
         params.append(status_filter)
 
     if date_filter:
-        try:
-            # Ensure it's a valid date format
-            datetime.strptime(date_filter, "%Y-%m-%d")
-            query += " AND DATE(order_date) = %s"
-            params.append(date_filter)
-        except ValueError:
-            flash("⚠️ Invalid date format. Use YYYY-MM-DD.", "error")
+        query += " AND DATE(order_date) = ?"
+        params.append(date_filter)
 
     query += " ORDER BY order_date DESC"
+    cursor = conn.execute(query, params)
 
-    cursor.execute(query, params)
-    orders = cursor.fetchall()
-    cursor.close()
+    orders = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
     return render_template(
@@ -722,26 +794,25 @@ def accept_order(order_id):
         flash("Unauthorized", "error")
         return redirect(url_for('home'))
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT admin_id FROM orders WHERE id = %s", (order_id,))
-    order = cursor.fetchone()
+    conn = get_orders_db()
+    order = conn.execute("SELECT admin_id FROM orders WHERE id = ?", (order_id,)).fetchone()
 
     if not order:
         flash("Order not found.", "error")
         conn.close()
         return redirect(url_for('orders'))
 
+    # Admin can only accept their own orders
     if user['role'] == 'admin' and order['admin_id'] != user['id']:
         flash("You are not authorized to accept this order.", "error")
         conn.close()
         return redirect(url_for('orders'))
 
-    accepted_at = datetime.now()  # ✅ Store as datetime object
-    cursor.execute("""
-        UPDATE orders 
-        SET status = 'accepted', accepted_at = %s 
-        WHERE id = %s
+    accepted_at = datetime.now().strftime("%d %b %Y, %I:%M %p")
+    conn.execute("""
+        UPDATE orders
+        SET status = 'accepted', accepted_at = ?
+        WHERE id = ?
     """, (accepted_at, order_id))
     conn.commit()
     conn.close()
@@ -756,10 +827,8 @@ def cancel_order(order_id):
         flash("Unauthorized access.", "error")
         return redirect(url_for("login_user"))
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT user_email, status, admin_id FROM orders WHERE id = %s", (order_id,))
-    order = cursor.fetchone()
+    conn = get_orders_db()
+    order = conn.execute("SELECT user_email, status, admin_id FROM orders WHERE id = ?", (order_id,)).fetchone()
 
     if not order:
         flash("Order not found.", "error")
@@ -780,11 +849,11 @@ def cancel_order(order_id):
         conn.close()
         return redirect(url_for("my_orders"))
 
-    cancelled_at = datetime.now()  # store as raw datetime
-    cursor.execute("""
-        UPDATE orders 
-        SET status = 'cancelled', cancelled_at = %s 
-        WHERE id = %s
+    cancelled_at = datetime.now().strftime("%d %b %Y, %I:%M %p")
+    conn.execute("""
+        UPDATE orders
+        SET status = 'cancelled', cancelled_at = ?
+        WHERE id = ?
     """, (cancelled_at, order_id))
     conn.commit()
     conn.close()
@@ -799,10 +868,8 @@ def deliver_order(order_id):
         flash("Unauthorized access.", "error")
         return redirect(url_for("home"))
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT status, admin_id FROM orders WHERE id = %s", (order_id,))
-    order = cursor.fetchone()
+    conn = get_orders_db()
+    order = conn.execute("SELECT status, admin_id FROM orders WHERE id = ?", (order_id,)).fetchone()
 
     if not order:
         flash("Order not found.", "error")
@@ -815,11 +882,11 @@ def deliver_order(order_id):
         return redirect(url_for("orders"))
 
     if order['status'] == 'accepted':
-        delivered_at = datetime.now()  # ✅ Correct: no formatting
-        cursor.execute("""
-            UPDATE orders 
-            SET status = 'delivered', delivered_at = %s 
-            WHERE id = %s
+        delivered_at = datetime.now().strftime("%d %b %Y, %I:%M %p")
+        conn.execute("""
+            UPDATE orders
+            SET status = 'delivered', delivered_at = ?
+            WHERE id = ?
         """, (delivered_at, order_id))
         conn.commit()
         flash("Order marked as delivered.", "success")
@@ -832,13 +899,12 @@ def deliver_order(order_id):
 @app.route('/delete_order/<int:order_id>', methods=['POST'])
 def delete_order(order_id):
     user = get_user()
-    if not user or user.get('role') != 'owner':
+    if not user or user.get('role') != 'owner':  # ✅ Only owner
         flash("Unauthorized", "error")
         return redirect(url_for('home'))
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM orders WHERE id = %s", (order_id,))
+    conn = get_orders_db()
+    conn.execute("DELETE FROM orders WHERE id = ?", (order_id,))
     conn.commit()
     conn.close()
 
@@ -861,22 +927,24 @@ def sales():
 
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        conn = get_mysql_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("""
+        conn = sqlite3.connect("bill.db")
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        cur.execute("""
             INSERT INTO bills (name, contact, address1, address2, city, pincode, total, created_at, admin_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (name, contact, address1, address2, city, pincode, 0, created_at, user["id"]))
-        bill_id = cursor.lastrowid
+        bill_id = cur.lastrowid
 
         items = []
         for key in request.form:
-            if key.startswith("products_name_"):
+            if key.startswith("product_name_"):
                 idx = key.split("_")[-1]
                 item_name = request.form.get(key)
-                qty = int(request.form.get(f"products_qty_{idx}") or 1)
+                qty = int(request.form.get(f"product_qty_{idx}") or 1)
                 if item_name:
-                    items.append(("products", item_name, qty))
+                    items.append(("product", item_name, qty))
             if key.startswith("service_name_"):
                 idx = key.split("_")[-1]
                 item_name = request.form.get(key)
@@ -886,87 +954,87 @@ def sales():
 
         total = 0
         for item_type, item_name, qty in items:
-            db = get_mysql_connection()
-            cur = db.cursor(dictionary=True)
-            table = "products" if item_type == "products" else "services"
-            cur.execute(f"SELECT price, discount_price FROM {table} WHERE name = %s", (item_name,))
-            row = cur.fetchone()
-            db.close()
+            db_file = "products.db" if item_type == "product" else "services.db"
+            table = "product" if item_type == "product" else "services"
+
+            lookup_conn = sqlite3.connect(db_file)
+            lookup_conn.row_factory = sqlite3.Row
+            row = lookup_conn.execute(f"SELECT price, discount_price FROM {table} WHERE name = ?", (item_name,)).fetchone()
+            lookup_conn.close()
 
             if row:
                 price = float(row["discount_price"] or row["price"] or 0)
                 total += price * qty
-                cursor.execute("""
+                cur.execute("""
                     INSERT INTO bill_items (bill_id, item_type, item_name, quantity, price)
-                    VALUES (%s, %s, %s, %s, %s)
+                    VALUES (?, ?, ?, ?, ?)
                 """, (bill_id, item_type, item_name, qty, price))
 
-        cursor.execute("UPDATE bills SET total = %s WHERE id = %s", (round(total, 2), bill_id))
+        cur.execute("UPDATE bills SET total = ? WHERE id = ?", (round(total, 2), bill_id))
         conn.commit()
         conn.close()
 
         flash("✅ Bill saved successfully!", "success")
         return redirect(url_for("sales"))
 
-    # === Online Orders ===
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
-
+    # ===== Online Orders =====
+    conn = get_orders_db()
     base_query = "SELECT * FROM orders"
     where_clause = ""
     params = []
 
     if user["role"] == "admin":
-        where_clause = " WHERE admin_id = %s"
+        where_clause = " WHERE admin_id = ?"
         params = [user["id"]]
 
-    cursor.execute(base_query + where_clause + " ORDER BY order_date DESC", params)
-    orders = cursor.fetchall()
+    orders = conn.execute(base_query + where_clause + " ORDER BY order_date DESC", params).fetchall()
 
-    cursor.execute(f"SELECT COUNT(*) AS count FROM orders{where_clause}", params)
-    total_orders = cursor.fetchone()["count"]
+    total_orders = conn.execute(f"SELECT COUNT(*) FROM orders{where_clause}", params).fetchone()[0]
 
-    cursor.execute(f"SELECT COUNT(*) AS count FROM orders WHERE status = 'delivered'" + (" AND admin_id = %s" if user["role"] == "admin" else ""), params)
-    delivered_orders = cursor.fetchone()["count"]
+    delivered_orders = conn.execute(
+        f"SELECT COUNT(*) FROM orders WHERE status = 'delivered'" + (" AND admin_id = ?" if user["role"] == "admin" else ""),
+        params if user["role"] == "admin" else []
+    ).fetchone()[0]
 
-    cursor.execute(f"SELECT COUNT(*) AS count FROM orders WHERE status = 'pending'" + (" AND admin_id = %s" if user["role"] == "admin" else ""), params)
-    pending_orders = cursor.fetchone()["count"]
+    pending_orders = conn.execute(
+        f"SELECT COUNT(*) FROM orders WHERE status = 'pending'" + (" AND admin_id = ?" if user["role"] == "admin" else ""),
+        params if user["role"] == "admin" else []
+    ).fetchone()[0]
 
-    cursor.execute(f"SELECT SUM(amount) AS total FROM orders WHERE status = 'delivered'" + (" AND admin_id = %s" if user["role"] == "admin" else ""), params)
-    total_revenue = cursor.fetchone()["total"] or 0
+    total_revenue = conn.execute(
+        f"SELECT SUM(amount) FROM orders WHERE status = 'delivered'" + (" AND admin_id = ?" if user["role"] == "admin" else ""),
+        params if user["role"] == "admin" else []
+    ).fetchone()[0] or 0
     conn.close()
 
-    # === Products ===
-    conn_products = get_mysql_connection()
-    cursor = conn_products.cursor(dictionary=True)
+    # ===== Products =====
+    conn_products = get_products_db()
     if user["role"] == "admin":
-        cursor.execute("SELECT * FROM products WHERE admin_id = %s", (user["id"],))
+        products = conn_products.execute("SELECT * FROM product WHERE admin_id = ?", (user["id"],)).fetchall()
     else:
-        cursor.execute("SELECT * FROM products")
-    products = cursor.fetchall()
+        products = conn_products.execute("SELECT * FROM product").fetchall()
     conn_products.close()
 
-    # === Services ===
-    conn_services = get_mysql_connection()
-    cursor = conn_services.cursor(dictionary=True)
+    # ===== Services =====
+    conn3 = sqlite3.connect("services.db")
+    conn3.row_factory = sqlite3.Row
     if user["role"] == "admin":
-        cursor.execute("SELECT * FROM services WHERE admin_id = %s", (user["id"],))
+        services = conn3.execute("SELECT * FROM services WHERE admin_id = ?", (user["id"],)).fetchall()
     else:
-        cursor.execute("SELECT * FROM services")
-    services = cursor.fetchall()
-    conn_services.close()
+        services = conn3.execute("SELECT * FROM services").fetchall()
+    conn3.close()
 
-    # === Offline Bills ===
-    conn_bills = get_mysql_connection()
-    cursor = conn_bills.cursor(dictionary=True)
+    # ===== Offline Bills =====
+    conn2 = sqlite3.connect("bill.db")
+    conn2.row_factory = sqlite3.Row
     if user["role"] == "admin":
-        cursor.execute("SELECT * FROM bills WHERE admin_id = %s ORDER BY created_at DESC", (user["id"],))
+        offline_bills = conn2.execute("SELECT * FROM bills WHERE admin_id = ? ORDER BY created_at DESC", (user["id"],)).fetchall()
     else:
-        cursor.execute("SELECT * FROM bills ORDER BY created_at DESC")
-    offline_bills = cursor.fetchall()
-    conn_bills.close()
+        offline_bills = conn2.execute("SELECT * FROM bills ORDER BY created_at DESC").fetchall()
 
     offline_revenue = sum(b["total"] for b in offline_bills if b["total"])
+    conn2.close()
+
     bills = [{
         "id": b["id"],
         "name": b["name"],
@@ -999,11 +1067,13 @@ def delete_bill(bill_id):
     if not user:
         return redirect(url_for("login_user"))
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
+    conn = sqlite3.connect("bill.db")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
 
-    cursor.execute("SELECT admin_id FROM bills WHERE id = %s", (bill_id,))
-    bill = cursor.fetchone()
+    # Check permission
+    cur.execute("SELECT admin_id FROM bills WHERE id = ?", (bill_id,))
+    bill = cur.fetchone()
 
     if not bill:
         conn.close()
@@ -1015,8 +1085,8 @@ def delete_bill(bill_id):
         flash("You are not authorized to delete this bill.", "error")
         return redirect(url_for("sales"))
 
-    cursor.execute("DELETE FROM bill_items WHERE bill_id = %s", (bill_id,))
-    cursor.execute("DELETE FROM bills WHERE id = %s", (bill_id,))
+    cur.execute("DELETE FROM bill_items WHERE bill_id = ?", (bill_id,))
+    cur.execute("DELETE FROM bills WHERE id = ?", (bill_id,))
     conn.commit()
     conn.close()
 
@@ -1029,24 +1099,25 @@ def print_bill(bill_id):
     if not user:
         return redirect(url_for("login_user"))
 
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
+    conn = sqlite3.connect("bill.db")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
 
-    cursor.execute("SELECT * FROM bills WHERE id = %s", (bill_id,))
-    bill = cursor.fetchone()
+    cur.execute("SELECT * FROM bills WHERE id = ?", (bill_id,))
+    bill = cur.fetchone()
 
     if not bill:
         conn.close()
         flash("Bill not found.", "error")
         return redirect(url_for("sales"))
 
+    # Permission check
     if user["role"] != "owner" and bill["admin_id"] != user["id"]:
         conn.close()
         flash("Unauthorized to view this bill.", "error")
         return redirect(url_for("sales"))
 
-    cursor.execute("SELECT * FROM bill_items WHERE bill_id = %s", (bill_id,))
-    items_raw = cursor.fetchall()
+    items_raw = cur.execute("SELECT * FROM bill_items WHERE bill_id = ?", (bill_id,)).fetchall()
     conn.close()
 
     final_items = []
@@ -1055,12 +1126,15 @@ def print_bill(bill_id):
         item_type = item["item_type"]
         quantity = int(item["quantity"])
 
-        conn_lookup = get_mysql_connection()
-        cur_lookup = conn_lookup.cursor(dictionary=True)
-        table = "products" if item_type == "products" else "services"
-        cur_lookup.execute(f"SELECT price, discount_price FROM {table} WHERE name = %s", (item_name,))
-        row = cur_lookup.fetchone()
-        conn_lookup.close()
+        db_file = "products.db" if item_type == "product" else "services.db"
+        table = "product" if item_type == "product" else "services"
+
+        db = sqlite3.connect(db_file)
+        db.row_factory = sqlite3.Row
+        cur = db.cursor()
+        cur.execute(f"SELECT price, discount_price FROM {table} WHERE name = ?", (item_name,))
+        row = cur.fetchone()
+        db.close()
 
         price = float(row["price"]) if row and row["price"] else 0.0
         discount_price = float(row["discount_price"]) if row and row["discount_price"] else price
@@ -1076,8 +1150,8 @@ def print_bill(bill_id):
 
     return render_template("print_receipt.html", bill=bill, items=final_items, user=user)
 
-@app.route('/products', methods=['GET', 'POST'])
-def products():
+@app.route('/product', methods=['GET', 'POST'])
+def product():
     user = get_user()
     if not user:
         return redirect(url_for("login_user"))
@@ -1094,7 +1168,7 @@ def products():
 
         if not (1 <= len(images) <= 5):
             flash("Upload between 1 to 5 images.", "error")
-            return redirect(url_for('products'))
+            return redirect(url_for('product'))
 
         upload_folder = os.path.join(current_app.root_path, "static/uploads/products")
         os.makedirs(upload_folder, exist_ok=True)
@@ -1107,38 +1181,33 @@ def products():
                 img.save(img_path)
                 saved_filenames.append(filename)
 
-        conn = get_mysql_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO products (name, description, price, discount_price, images, admin_id) VALUES (%s, %s, %s, %s, %s, %s)",
+        conn = get_products_db()
+        conn.execute(
+            "INSERT INTO product (name, description, price, discount_price, images, admin_id) VALUES (?, ?, ?, ?, ?, ?)",
             (name, description, price, discount_price, json.dumps(saved_filenames), user['id'])
         )
         conn.commit()
         conn.close()
 
-        flash("products item added successfully!", "success")
-        return redirect(url_for('products'))
+        flash("Product item added successfully!", "success")
+        return redirect(url_for('product'))
 
     # GET: Fetch products based on role
-    conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
+    conn = get_products_db()
 
     if is_owner:
-        cursor.execute("SELECT * FROM products ORDER BY id DESC")
+        rows = conn.execute("SELECT * FROM product ORDER BY id DESC").fetchall()
     else:
-        cursor.execute("SELECT * FROM products WHERE admin_id = %s ORDER BY id DESC", (user["id"],))
-    
-    rows = cursor.fetchall()
-    conn.close()
+        rows = conn.execute("SELECT * FROM product WHERE admin_id = ? ORDER BY id DESC", (user["id"],)).fetchall()
 
-    products_items = []
+    product_items = []
     for row in rows:
         try:
             images = json.loads(row["images"]) if row["images"] else []
         except Exception:
             images = []
 
-        products_items.append({
+        product_items.append({
             "id": row["id"],
             "name": row["name"],
             "description": row["description"],
@@ -1146,61 +1215,66 @@ def products():
             "discount_price": row["discount_price"],
             "images": images
         })
+    conn.close()
 
     return render_template(
-        'products.html',
+        'product.html',
         user=user,
         full_name=full_name,
-        products_items=products_items
+        product_items=product_items
     )
 
-@app.route('/edit_products/<int:item_id>', methods=['POST'])
-def edit_products(item_id):
+@app.route('/edit_product/<int:item_id>', methods=['POST'])
+def edit_product(item_id):
     user = get_user()
     if not user or user.get("role") not in ["admin", "owner"]:
         flash("Unauthorized", "error")
         return redirect(url_for("home"))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
+    conn = get_products_db()
+    conn.row_factory = sqlite3.Row
 
-    cur.execute("SELECT images, admin_id FROM products WHERE id = %s", (item_id,))
+    cur = conn.execute("SELECT images, admin_id FROM product WHERE id = ?", (item_id,))
     row = cur.fetchone()
 
     if not row:
-        flash("products not found.", "error")
-        cur.close()
+        flash("Product not found.", "error")
         conn.close()
-        return redirect(url_for("products"))
+        return redirect(url_for("product"))
 
+    # 🛡️ Restrict admins from editing others' products
     if user["role"] == "admin" and row["admin_id"] != user["id"]:
-        flash("You are not authorized to edit this products.", "error")
-        cur.close()
+        flash("You are not authorized to edit this product.", "error")
         conn.close()
-        return redirect(url_for("products"))
+        return redirect(url_for("product"))
 
+    old_images = []
     try:
         old_images = json.loads(row["images"]) if row["images"] else []
     except Exception:
         old_images = row["images"].split(',')
 
+    # 📝 Form fields
     name = request.form['name']
     description = request.form.get('description', '')
     price = request.form['price']
     discount_price = request.form['discount_price']
+
     uploaded_files = request.files.getlist('images')
     new_images = []
 
-    upload_folder = os.path.join(current_app.root_path, "static/uploads/productss")
+    upload_folder = os.path.join(current_app.root_path, "static/uploads/products")
     os.makedirs(upload_folder, exist_ok=True)
 
     if uploaded_files and any(f.filename for f in uploaded_files):
+        # Delete old images
         for img in old_images:
             try:
                 os.remove(os.path.join(upload_folder, img))
             except Exception as e:
-                print(f"Error deleting {img}: {e}")
+                print(f"Error deleting old image {img}: {e}")
 
+        # Save new images
         for file in uploaded_files:
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
@@ -1210,72 +1284,73 @@ def edit_products(item_id):
 
         if len(new_images) > 5:
             flash("You can upload a maximum of 5 images.", "error")
-            cur.close()
             conn.close()
-            return redirect(url_for('products'))
+            return redirect(url_for('product'))
     else:
-        new_images = old_images
+        new_images = old_images  # Keep old images if no new ones uploaded
 
-    cur.execute("""
-        UPDATE products
-        SET name = %s, description = %s, price = %s, discount_price = %s, images = %s
-        WHERE id = %s
+    # 🔄 Update product
+    conn.execute("""
+        UPDATE product
+        SET name = ?, description = ?, price = ?, discount_price = ?, images = ?
+        WHERE id = ?
     """, (name, description, price, discount_price, json.dumps(new_images), item_id))
 
     conn.commit()
-    cur.close()
     conn.close()
 
-    flash("products updated successfully.", "success")
-    return redirect(url_for('products'))
+    flash("Product item updated successfully.", "success")
+    return redirect(url_for('product'))
 
-
-@app.route('/delete_products/<int:item_id>', methods=['POST'])
-def delete_products(item_id):
+@app.route('/delete_product/<int:item_id>', methods=['POST'])
+def delete_product(item_id):
     user = get_user()
     if not user or user.get("role") not in ["admin", "owner"]:
         flash("Unauthorized action.", "error")
         return redirect(url_for("home"))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
+    conn = get_products_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
 
-    cur.execute("SELECT images, admin_id FROM products WHERE id = %s", (item_id,))
-    products = cur.fetchone()
-
-    if not products:
-        flash("products not found.", "error")
-        cur.close()
+    # Fetch product details including admin_id
+    product = cur.execute("SELECT images, admin_id FROM product WHERE id = ?", (item_id,)).fetchone()
+    if not product:
+        flash("Product not found.", "error")
         conn.close()
-        return redirect(url_for("products"))
+        return redirect(url_for("product"))
 
-    if user['role'] == 'admin' and products['admin_id'] != user['id']:
-        flash("You are not authorized to delete this products.", "error")
-        cur.close()
+    # ✅ Admins can delete only their own products
+    if user['role'] == 'admin' and product['admin_id'] != user['id']:
+        flash("You are not authorized to delete this product.", "error")
         conn.close()
-        return redirect(url_for("products"))
+        return redirect(url_for("product"))
 
+    # Delete associated images
+    image_list = []
     try:
-        image_list = json.loads(products["images"]) if products["images"] else []
+        image_list = json.loads(product["images"]) if product["images"] else []
     except Exception:
-        image_list = products["images"].split(',')
+        image_list = product["images"].split(',')
 
     upload_folder = os.path.join(current_app.root_path, "static/uploads/products")
     for img_filename in image_list:
-        img_path = os.path.join(upload_folder, img_filename.strip())
-        if os.path.exists(img_path):
-            try:
-                os.remove(img_path)
-            except Exception as e:
-                print(f"Failed to delete image {img_path}: {e}")
+        img_filename = img_filename.strip()
+        if img_filename:
+            img_path = os.path.join(upload_folder, img_filename)
+            if os.path.exists(img_path):
+                try:
+                    os.remove(img_path)
+                except Exception as e:
+                    print(f"Failed to delete image {img_path}: {e}")
 
-    cur.execute("DELETE FROM products WHERE id = %s", (item_id,))
+    # Delete the product from DB
+    cur.execute("DELETE FROM product WHERE id = ?", (item_id,))
     conn.commit()
-    cur.close()
     conn.close()
 
-    flash("products deleted successfully.", "success")
-    return redirect(url_for('products'))
+    flash("Product item deleted successfully.", "success")
+    return redirect(url_for('product'))
 
 @app.route("/services", methods=["GET", "POST"])
 def services():
@@ -1283,8 +1358,7 @@ def services():
     if not user:
         return redirect(url_for("login_user"))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
+    conn = get_services_db()
 
     if request.method == "POST":
         name = request.form.get("name")
@@ -1293,46 +1367,43 @@ def services():
         description = request.form.get("description")
 
         image_url = None
-        file = request.files.get("image")
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            upload_folder = os.path.join(current_app.root_path, "static/uploads/services")
-            os.makedirs(upload_folder, exist_ok=True)
-            filepath = os.path.join(upload_folder, filename)
-            file.save(filepath)
-            image_url = f"/static/uploads/services/{filename}"
+        if "image" in request.files:
+            file = request.files["image"]
+            if file and file.filename != "":
+                filename = secure_filename(file.filename)
+                upload_folder = os.path.join(current_app.root_path, "static/uploads/services")
+                os.makedirs(upload_folder, exist_ok=True)
+                filepath = os.path.join(upload_folder, filename)
+                file.save(filepath)
+                image_url = f"/static/uploads/services/{filename}"
 
-        cur.execute("""
-            INSERT INTO services (name, price, discount_price, description, image_url, admin_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (name, price, discount_price, description, image_url, user["id"]))
+        # Insert with admin_id
+        conn.execute(
+            "INSERT INTO services (name, price, discount_price, description, image_url, admin_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (name, price, discount_price, description, image_url, user["id"])
+        )
         conn.commit()
         flash("Service added successfully!", "success")
-        return redirect(url_for("services"))
 
-    # Fetch services
+    # Filter services: owner sees all, admin sees only theirs
+    conn.row_factory = sqlite3.Row
     if user["role"] == "owner":
-        cur.execute("SELECT * FROM services ORDER BY id DESC")
+        rows = conn.execute("SELECT * FROM services ORDER BY id DESC").fetchall()
     else:
-        cur.execute("SELECT * FROM services WHERE admin_id = %s ORDER BY id DESC", (user["id"],))
+        rows = conn.execute("SELECT * FROM services WHERE admin_id = ? ORDER BY id DESC", (user["id"],)).fetchall()
 
-    rows = cur.fetchall()
-    cur.close()
     conn.close()
 
-    services = []
-    for row in rows:
-        services.append({
-            "id": row["id"],
-            "name": row["name"],
-            "price": row["price"],
-            "discount_price": row.get("discount_price", "") or "",
-            "description": row.get("description", "") or "",
-            "image_url": row.get("image_url", "") or ""
-        })
+    services = [dict(row) for row in rows]
+    for s in services:
+        s["id"] = s.get("id", 0)
+        s["name"] = s.get("name", "")
+        s["price"] = s.get("price", 0)
+        s["discount_price"] = s.get("discount_price") or ""
+        s["description"] = s.get("description") or ""
+        s["image_url"] = s.get("image_url") or ""
 
     return render_template("services.html", user=user, full_name=user["full_name"], services=services)
-
 
 @app.route('/edit_service/<int:service_id>', methods=['POST'])
 def edit_service(service_id):
@@ -1341,14 +1412,13 @@ def edit_service(service_id):
         flash("Unauthorized", "error")
         return redirect(url_for("services"))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM services WHERE id = %s", (service_id,))
-    service = cur.fetchone()
+    conn = get_services_db()
+    conn.row_factory = sqlite3.Row
+    service = conn.execute("SELECT * FROM services WHERE id = ?", (service_id,)).fetchone()
 
+    # Check ownership if user is admin
     if not service or (user["role"] == "admin" and service["admin_id"] != user["id"]):
-        flash("Unauthorized or service not found.", "error")
-        cur.close()
+        flash("Unauthorized access or service not found.", "error")
         conn.close()
         return redirect(url_for("services"))
 
@@ -1358,27 +1428,26 @@ def edit_service(service_id):
     description = request.form.get("description")
     image_url = service["image_url"]
 
-    file = request.files.get("image")
-    if file and file.filename:
-        filename = secure_filename(file.filename)
-        upload_folder = os.path.join(current_app.root_path, "static/uploads/services")
-        os.makedirs(upload_folder, exist_ok=True)
-        filepath = os.path.join(upload_folder, filename)
-        file.save(filepath)
-        image_url = f"/static/uploads/services/{filename}"
+    if "image" in request.files:
+        file = request.files["image"]
+        if file and file.filename != "":
+            filename = secure_filename(file.filename)
+            upload_folder = os.path.join(current_app.root_path, "static/uploads/services")
+            os.makedirs(upload_folder, exist_ok=True)
+            filepath = os.path.join(upload_folder, filename)
+            file.save(filepath)
+            image_url = f"/static/uploads/services/{filename}"
 
-    cur.execute("""
+    conn.execute("""
         UPDATE services
-        SET name = %s, price = %s, discount_price = %s, description = %s, image_url = %s
-        WHERE id = %s
+        SET name = ?, price = ?, discount_price = ?, description = ?, image_url = ?
+        WHERE id = ?
     """, (name, price, discount_price, description, image_url, service_id))
     conn.commit()
-    cur.close()
     conn.close()
 
     flash("Service updated successfully.", "success")
     return redirect(url_for("services"))
-
 
 @app.route('/delete_service/<int:service_id>', methods=['POST'])
 def delete_service(service_id):
@@ -1387,20 +1456,18 @@ def delete_service(service_id):
         flash("Unauthorized", "error")
         return redirect(url_for("services"))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM services WHERE id = %s", (service_id,))
-    service = cur.fetchone()
+    conn = get_services_db()
+    conn.row_factory = sqlite3.Row
+    service = conn.execute("SELECT * FROM services WHERE id = ?", (service_id,)).fetchone()
 
+    # Check ownership if admin
     if not service or (user["role"] == "admin" and service["admin_id"] != user["id"]):
         flash("Unauthorized to delete this service.", "error")
-        cur.close()
         conn.close()
         return redirect(url_for("services"))
 
-    cur.execute("DELETE FROM services WHERE id = %s", (service_id,))
+    conn.execute("DELETE FROM services WHERE id = ?", (service_id,))
     conn.commit()
-    cur.close()
     conn.close()
 
     flash("Service deleted successfully.", "success")
@@ -1412,15 +1479,20 @@ def contact():
 
     if not user:
         flash("Please login to contact support.", "login_error")
+
         user_agent = request.headers.get('User-Agent', '').lower()
         is_mobile = "mobi" in user_agent or "android" in user_agent or "iphone" in user_agent
-        return redirect("/mobile" if is_mobile else url_for("login_user", open_login="true"))
+
+        if is_mobile:
+            return redirect("/mobile")
+        else:
+            return redirect(url_for("login_user", open_login="true"))
 
     if request.method == "POST":
         flash("Messaging system is disabled.", "info")
+        # You can add more POST logic here if needed
 
     return render_template("contact.html", full_name=user["full_name"], user=user)
-
 
 @app.route("/settings")
 def settings():
@@ -1430,17 +1502,18 @@ def settings():
         flash("Please log in to access settings.", "login_error")
         user_agent = request.headers.get('User-Agent', '').lower()
         is_mobile = "mobi" in user_agent or "android" in user_agent or "iphone" in user_agent
-        return redirect("/mobile" if is_mobile else url_for("login_user", open_login="true"))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM security_questions")
-    questions = cur.fetchall()
-    cur.close()
+        if is_mobile:
+            return redirect("/mobile")
+        else:
+            return redirect(url_for("login_user", open_login="true"))
+
+    conn = sqlite3.connect("security.db")
+    conn.row_factory = sqlite3.Row
+    questions = conn.execute("SELECT * FROM security_questions").fetchall()
     conn.close()
 
     return render_template("settings.html", user=user, full_name=user.get("full_name"), questions=questions)
-
 
 @app.route("/delete-account", methods=["POST"])
 def delete_account():
@@ -1451,19 +1524,18 @@ def delete_account():
     email = user["email"]
     role = user.get("role", "")
 
+    # Block deletion differently for admin and owner
     if role == "admin":
-        flash("Admins cannot delete their account directly.", "error")
+        flash("Admin users cannot delete their account directly.", "error")
         return redirect(url_for("settings", admin_delete_blocked=1))
     elif role == "owner":
         flash("Owner account deletion is restricted.", "error")
         return redirect(url_for("settings", owner_delete_blocked=1))
 
     try:
-        conn = get_mysql_connection()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM users WHERE email = %s", (email,))
+        conn = sqlite3.connect("users.db")
+        conn.execute("DELETE FROM users WHERE email = ?", (email,))
         conn.commit()
-        cur.close()
         conn.close()
     except Exception as e:
         print("Delete Error:", e)
@@ -1475,49 +1547,65 @@ def delete_account():
     flash("✅ Your account has been deleted.", "success")
     return redirect(url_for("register"))
 
+import os
+import sqlite3
+from flask import (
+    request, redirect, url_for, flash, render_template,
+    current_app
+)
+from werkzeug.utils import secure_filename
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route("/account", methods=["GET", "POST"])
 def account():
     user = get_user()
-
     if not user:
         flash("Please log in to access your account.", "login_error")
         user_agent = request.headers.get('User-Agent', '').lower()
         is_mobile = "mobi" in user_agent or "android" in user_agent or "iphone" in user_agent
-        return redirect("/mobile" if is_mobile else url_for("login_user", open_login="true"))
+
+        if is_mobile:
+            return redirect("/mobile")
+        else:
+            return redirect(url_for("login_user", open_login="true"))
 
     if request.method == "POST":
         full_name = request.form.get("full_name", "").strip()
         gender_id = request.form.get("gender_id", 1)
 
-        conn = get_mysql_connection()
+        conn = sqlite3.connect("users.db")
         cur = conn.cursor()
 
         if 'remove_image' in request.form:
-            cur.execute("UPDATE users SET profile_image = NULL WHERE id = %s", (user["id"],))
+            cur.execute("UPDATE users SET profile_image = NULL WHERE id = ?", (user["id"],))
 
         image = request.files.get("image")
         if image and allowed_file(image.filename):
             filename = secure_filename(image.filename)
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            image.save(image_path)
-            cur.execute("UPDATE users SET profile_image = %s WHERE id = %s", (filename, user["id"]))
 
-        cur.execute("UPDATE users SET full_name = %s, gender_id = %s WHERE id = %s",
+            upload_folder = os.path.join(current_app.root_path, "static/images")
+            os.makedirs(upload_folder, exist_ok=True)
+
+            filepath = os.path.join(upload_folder, filename)
+            image.save(filepath)
+
+            image_url = f"/static/images/{filename}"
+            cur.execute("UPDATE users SET profile_image = ? WHERE id = ?", (image_url, user["id"]))
+
+        cur.execute("UPDATE users SET full_name = ?, gender_id = ? WHERE id = ?",
                     (full_name, gender_id, user["id"]))
         conn.commit()
-        cur.close()
         conn.close()
 
         flash("Account updated successfully.", "success")
         return redirect(url_for("account"))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM security_questions")
-    questions = cur.fetchall()
-    cur.close()
+    conn = sqlite3.connect("security.db")
+    questions = conn.execute("SELECT * FROM questions").fetchall()
     conn.close()
 
     return render_template("account.html", user=user, questions=questions)
@@ -1536,10 +1624,10 @@ def change_password():
         flash("New password and confirmation do not match.", "error")
         return redirect(url_for("account"))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT password, temp_password, temp_password_uses FROM users WHERE email = %s", (user["email"],))
-    row = cur.fetchone()
+    conn = sqlite3.connect("users.db")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    row = cur.execute("SELECT password, temp_password, temp_password_uses FROM users WHERE email = ?", (user["email"],)).fetchone()
 
     if not row:
         conn.close()
@@ -1550,24 +1638,23 @@ def change_password():
     temp_password = row["temp_password"]
     temp_uses = row["temp_password_uses"] or 0
 
+    # Check if old_pw matches real OR valid temp password
     is_real = check_password_hash(db_password, old_pw)
     is_temp = temp_password == old_pw and temp_uses < 2
 
     if is_real or is_temp:
         cur.execute("""
-            UPDATE users 
-            SET password = %s, temp_password = NULL, temp_password_uses = 0 
-            WHERE email = %s
+            UPDATE users
+            SET password = ?, temp_password = NULL, temp_password_uses = 0
+            WHERE email = ?
         """, (generate_password_hash(new_pw), user["email"]))
         conn.commit()
         flash("Password updated successfully.", "success")
     else:
         flash("Current password is incorrect.", "error")
 
-    cur.close()
     conn.close()
     return redirect(url_for("account"))
-
 
 @app.route("/change-info", methods=["POST"])
 def change_info():
@@ -1583,32 +1670,31 @@ def change_info():
         flash("Please provide at least one field to update.", "error")
         return redirect(url_for("account"))
 
-    conn = get_mysql_connection()
+    conn = sqlite3.connect("users.db")
     cur = conn.cursor()
 
+    # ✅ If email is changed, require OTP
     if email and email != user["email"]:
         if not session.get("otp_verified"):
             flash("Please verify OTP before changing your email.", "error")
-            cur.close()
             conn.close()
             return redirect(url_for("account"))
-        cur.execute("UPDATE users SET email = %s WHERE id = %s", (email, user["id"]))
-        session["user"]["email"] = email
+        cur.execute("UPDATE users SET email = ? WHERE id = ?", (email, user["id"]))
+        session["user"]["email"] = email  # Update session email
+        # Clear OTP session after success
         session.pop("otp_verified", None)
         session.pop("register_otp", None)
         session.pop("otp_expiry", None)
 
     if contact and contact != user["contact"]:
-        cur.execute("UPDATE users SET contact = %s WHERE id = %s", (contact, user["id"]))
+        cur.execute("UPDATE users SET contact = ? WHERE id = ?", (contact, user["id"]))
         session["user"]["contact"] = contact
 
     conn.commit()
-    cur.close()
     conn.close()
 
     flash("Information updated successfully.", "success")
     return redirect(url_for("account"))
-
 
 @app.route("/set-security", methods=["POST"])
 def set_security():
@@ -1619,11 +1705,10 @@ def set_security():
             flash("Session expired. Please login again.", "error")
             return redirect(url_for("account"))
 
-        conn = get_mysql_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id FROM users WHERE email = %s", (user["email"],))
-        row = cur.fetchone()
-        cur.close()
+        # Get user id from DB if not in session
+        conn = sqlite3.connect("users.db")
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT id FROM users WHERE email = ?", (user["email"],)).fetchone()
         conn.close()
 
         if not row:
@@ -1631,7 +1716,7 @@ def set_security():
             return redirect(url_for("account"))
 
         user_id = row["id"]
-        session["user_id"] = user_id
+        session["user_id"] = user_id  # Save it for next time
 
     question = request.form.get("question")
     answer = request.form.get("answer")
@@ -1640,15 +1725,13 @@ def set_security():
         flash("Please select a question and provide an answer.", "error")
         return redirect(url_for("account"))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        UPDATE users 
-        SET security_question = %s, security_answer = %s 
-        WHERE id = %s
+    conn = sqlite3.connect("users.db")
+    conn.execute("""
+        UPDATE users
+        SET security_question = ?, security_answer = ?
+        WHERE id = ?
     """, (question, answer, user_id))
     conn.commit()
-    cur.close()
     conn.close()
 
     flash("Security question and answer updated successfully.", "success")
@@ -1669,32 +1752,28 @@ def forgot():
         elif not question or not answer:
             flash("Security question and answer are required.", "error")
         else:
-            conn = get_mysql_connection()
-            cur = conn.cursor(dictionary=True)
-            cur.execute("""
+            conn = sqlite3.connect("users.db")
+            conn.row_factory = sqlite3.Row
+
+            user = conn.execute("""
                 SELECT * FROM users
-                WHERE (email = %s OR contact = %s) AND security_question = %s AND security_answer = %s
-            """, (email, contact, question, answer))
-            user = cur.fetchone()
+                WHERE (email = ? OR contact = ?) AND security_question = ? AND security_answer = ?
+            """, (email, contact, question, answer)).fetchone()
 
             if user:
-                temp_password = "Temp@123"  # or use generate_temp_password()
-                cur.execute("UPDATE users SET temp_password = %s, temp_password_uses = 0 WHERE id = %s",
-                            (temp_password, user["id"]))
+                # Example temp password logic
+                temp_password = "Temp@123"  # or generate randomly
+                conn.execute("UPDATE users SET temp_password = ? WHERE id = ?", (temp_password, user["id"]))
                 conn.commit()
                 flash(f"🔑 Your temporary password is <b>{temp_password}</b>. It can be used only 2 times. Please change your password after login.", "success")
             else:
                 flash("User not found or incorrect security answer.", "error")
 
-            cur.close()
             conn.close()
 
-    # Fetch questions from MySQL (not from `security.db`)
-    conn2 = get_mysql_connection()
-    cur2 = conn2.cursor(dictionary=True)
-    cur2.execute("SELECT * FROM security_questions")  # Assuming table is migrated to MySQL
-    questions = cur2.fetchall()
-    cur2.close()
+    # Fetch questions from security.db
+    conn2 = sqlite3.connect("security.db")
+    questions = conn2.execute("SELECT * FROM questions").fetchall()
     conn2.close()
 
     return render_template("forgot.html", questions=questions, temp_password=temp_password)
@@ -1706,11 +1785,9 @@ def send_reset_otp():
     if not email:
         return jsonify(success=False, message="⚠️ Email is required.")
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT id FROM users WHERE email = %s", (email,))
-    user = cur.fetchone()
-    cur.close()
+    conn = sqlite3.connect("users.db")
+    conn.row_factory = sqlite3.Row
+    user = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
     conn.close()
 
     if not user:
@@ -1719,21 +1796,25 @@ def send_reset_otp():
     now = time.time()
     otp_expiry = session.get("otp_expiry", 0)
 
+    # Cooldown to prevent OTP spamming
     if otp_expiry and now < otp_expiry:
         remaining = int((otp_expiry - now) // 60) + 1
         return jsonify(success=False, message=f"⚠️ OTP already sent. Try again in {remaining} minute(s).")
 
+    # Generate OTP (example: 6-digit random)
     otp = generate_random_otp()
+
+    # Store in session
     session["register_email"] = email
     session["register_otp"] = otp
-    session["otp_expiry"] = now + 300  # 5 minutes
+    session["otp_expiry"] = now + 300   # 5 minutes
     session["otp_verified"] = False
 
+    # Send OTP
     if send_otp_to_email(email, otp):
         return jsonify(success=True, message="✅ OTP has been sent to your email.")
 
     return jsonify(success=False, message="❌ Failed to send OTP. Please try again.")
-
 
 @app.route("/verify-reset-otp", methods=["POST"])
 def verify_reset_otp():
@@ -1741,10 +1822,12 @@ def verify_reset_otp():
     email = data.get("email", "").strip().lower()
     otp = data.get("otp", "").strip()
 
+    # Get stored values from session
     saved_otp = session.get("register_otp")
     saved_email = session.get("register_email")
     expiry = session.get("otp_expiry", 0)
 
+    # Check if OTP is valid
     if not saved_otp or not saved_email or time.time() > expiry:
         return jsonify(success=False, message="❌ OTP expired or not found.")
 
@@ -1757,7 +1840,6 @@ def verify_reset_otp():
     session["otp_verified"] = True
     return jsonify(success=True, message="✅ OTP verified successfully.")
 
-
 @app.route("/recover_otp", methods=["POST"])
 def recover_otp():
     email = request.form.get("otp_email", "").strip().lower()
@@ -1765,77 +1847,72 @@ def recover_otp():
     new_password = request.form.get("new_password", "")
     confirm_password = request.form.get("confirm_password", "")
 
+    # Check all fields are filled
     if not email or not otp or not new_password or not confirm_password:
         flash("⚠️ All fields are required.", "error")
         return redirect(url_for("forgot"))
 
+    # Check password match
     if new_password != confirm_password:
         flash("❌ Passwords do not match.", "error")
         return redirect(url_for("forgot"))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-    user = cur.fetchone()
+    # Check user exists
+    conn = sqlite3.connect("users.db")
+    conn.row_factory = sqlite3.Row
+    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
 
     if not user:
-        cur.close()
         conn.close()
         flash("❌ Email does not exist.", "error")
         return redirect(url_for("forgot"))
 
+    # Validate OTP from session
     stored_otp = session.get("register_otp")
     stored_email = session.get("register_email")
     expiry = session.get("otp_expiry", 0)
     is_verified = session.get("otp_verified", False)
 
     if not stored_otp or not stored_email:
-        cur.close()
         conn.close()
         flash("❌ No OTP found. Please request again.", "error")
         return redirect(url_for("forgot"))
 
     if email != stored_email:
-        cur.close()
         conn.close()
         flash("❌ Email does not match the one used for OTP.", "error")
         return redirect(url_for("forgot"))
 
     if time.time() > expiry:
-        cur.close()
         conn.close()
         flash("⌛ OTP has expired. Please request a new one.", "error")
         return redirect(url_for("forgot"))
 
     if otp != stored_otp:
-        cur.close()
         conn.close()
         flash("❌ Incorrect OTP. Please try again.", "error")
         return redirect(url_for("forgot"))
 
     if not is_verified:
-        cur.close()
         conn.close()
         flash("⚠️ Please verify your OTP before resetting the password.", "error")
         return redirect(url_for("forgot"))
 
+    # Update the password
     hashed_pw = generate_password_hash(new_password)
     try:
-        cur.execute("UPDATE users SET password = %s WHERE email = %s", (hashed_pw, email))
+        conn.execute("UPDATE users SET password = ? WHERE email = ?", (hashed_pw, email))
         conn.commit()
-
-        # Clear OTP session data
+        flash("✅ Password reset successful. Please login.", "success")
+        # Optional: clear OTP session data
         session.pop("register_email", None)
         session.pop("register_otp", None)
         session.pop("otp_verified", None)
         session.pop("otp_expiry", None)
-
-        flash("✅ Password reset successful. Please login.", "success")
     except Exception as e:
         print("Error resetting password:", e)
         flash("❌ Something went wrong. Please try again.", "error")
     finally:
-        cur.close()
         conn.close()
 
     return redirect(url_for("login_user"))
@@ -1850,6 +1927,7 @@ def register():
         confirm_password = request.form.get("confirm_password", "")
         otp = request.form.get("otp", "").strip()
 
+        # Validate required fields
         if not full_name or not contact or not email or not password or not confirm_password:
             flash("All fields are required.", "register_error")
             return redirect(url_for("login_user"))
@@ -1858,33 +1936,22 @@ def register():
             flash("Passwords do not match.", "register_error")
             return redirect(url_for("login_user"))
 
-        # Optional: Check OTP verification
-        if session.get("register_email") != email or not session.get("otp_verified"):
-            flash("OTP verification failed or email mismatch.", "register_error")
-            return redirect(url_for("login_user"))
-
         hashed_pw = generate_password_hash(password)
 
         try:
-            conn = get_mysql_connection()
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO users (full_name, contact, email, password, role) VALUES (%s, %s, %s, %s, %s)",
+            conn = sqlite3.connect("users.db")
+            conn.execute(
+                "INSERT INTO users (full_name, contact, email, password, role) VALUES (?, ?, ?, ?, ?)",
                 (full_name, contact, email, hashed_pw, 'user')
             )
             conn.commit()
 
-            # Send welcome email
+            # ✅ Send welcome email after successful registration
             send_user_welcome_email(email, full_name)
+
             flash("Registration successful. Please login.", "register_success")
 
-            # Clear session after successful registration
-            session.pop("register_email", None)
-            session.pop("register_otp", None)
-            session.pop("otp_expiry", None)
-            session.pop("otp_verified", None)
-
-        except mysql.connector.IntegrityError:
+        except sqlite3.IntegrityError:
             flash("Email already registered.", "register_error")
         except Exception as e:
             flash("Something went wrong. Please try again.", "register_error")
@@ -1898,26 +1965,27 @@ def register():
 
 @app.route("/send-otp", methods=["POST"])
 def send_otp():
-    email = request.json.get("email", "").strip().lower()
+    email = request.json.get("email", "").strip()
     if not email:
         return jsonify(success=False, message="Email is required.")
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT id FROM users WHERE email = %s", (email,))
-    user = cur.fetchone()
-    cur.close()
+    # ✅ Check if email already exists in users database
+    conn = sqlite3.connect("users.db")
+    conn.row_factory = sqlite3.Row
+    user = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
     conn.close()
 
     if user:
         return jsonify(success=False, message="⚠️ Email already exists. Please log in instead.")
 
+    # ✅ Cooldown check
     now = time.time()
     expiry = session.get("otp_expiry", 0)
     if expiry and now < expiry:
         remaining = int((expiry - now) // 60)
         return jsonify(success=False, message=f"OTP already sent. Try again after {remaining} min.")
 
+    # ✅ Generate and send OTP
     otp = generate_random_otp()
     session["register_otp"] = otp
     session["register_email"] = email
@@ -1935,7 +2003,7 @@ def verify_otp():
     actual_otp = session.get("register_otp", "").strip()
     expiry = session.get("otp_expiry", 0)
 
-    if time.time() > expiry:
+    if datetime.now().timestamp() > expiry:
         return jsonify(verified=False, message="OTP expired. Please request a new one.")
 
     if user_otp == actual_otp:
@@ -1951,26 +2019,21 @@ def create_admin():
         flash("Unauthorized access.", "error")
         return redirect(url_for('login_user'))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor(dictionary=True)
+    conn = get_users_db()
 
     if request.method == 'POST':
         full_name = request.form.get('full_name')
-        email = request.form.get('email').strip().lower()
+        email = request.form.get('email')
         contact = request.form.get('contact')
 
         if not full_name or not email or not contact:
             flash("All fields are required.", "error")
-            cur.close()
             conn.close()
             return redirect(url_for('create_admin'))
 
-        cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-        existing_user = cur.fetchone()
-
+        existing_user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         if existing_user:
             flash("Email already exists.", "error")
-            cur.close()
             conn.close()
             return redirect(url_for('create_admin'))
 
@@ -1978,13 +2041,13 @@ def create_admin():
         password_hash = generate_password_hash(default_password)
 
         try:
-            cur.execute(
-                "INSERT INTO users (full_name, email, contact, password, role) VALUES (%s, %s, %s, %s, %s)",
+            conn.execute(
+                "INSERT INTO users (full_name, email, contact, password, role) VALUES (?, ?, ?, ?, ?)",
                 (full_name, email, contact, password_hash, 'admin')
             )
             conn.commit()
 
-            # Send welcome email
+            # Send welcome email with plain password used
             subject = "Your Admin Account Credentials"
             body = f"""Hi {full_name},
 
@@ -1995,7 +2058,7 @@ Your admin account has been created successfully.
 
 Please log in and change your password immediately from your account settings.
 
-Best regards,  
+Best regards,
 Yash Cyber Cafe Team
 """
             message = f"Subject: {subject}\n\n{body}"
@@ -2011,9 +2074,7 @@ Yash Cyber Cafe Team
             print("Admin creation or email error:", e)
             flash("Admin created, but email sending failed.", "error")
 
-    cur.execute("SELECT id, full_name AS name, email, contact FROM users WHERE role = 'admin'")
-    admins = cur.fetchall()
-    cur.close()
+    admins = conn.execute("SELECT id, full_name as name, email, contact FROM users WHERE role = 'admin'").fetchall()
     conn.close()
 
     return render_template('create_admin.html', user=user, admins=admins)
@@ -2025,11 +2086,9 @@ def delete_admin(admin_id):
         flash("Unauthorized access.", "error")
         return redirect(url_for('login_user'))
 
-    conn = get_mysql_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM users WHERE id = %s AND role = 'admin'", (admin_id,))
+    conn = get_users_db()
+    conn.execute("DELETE FROM users WHERE id = ? AND role = 'admin'", (admin_id,))
     conn.commit()
-    cur.close()
     conn.close()
 
     flash("Admin deleted successfully.", "success")
@@ -2037,6 +2096,10 @@ def delete_admin(admin_id):
 
 @app.route("/login_admin", methods=["GET", "POST"])
 def login_admin():
+    # ✅ Auto-redirect if already logged in
+    if "user_id" in session:
+        return redirect(url_for("home"))
+
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "").strip()
@@ -2045,14 +2108,12 @@ def login_admin():
             flash("Email and password are required.", "error")
             return redirect(url_for("login_admin"))
 
-        conn = get_mysql_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT * FROM users WHERE LOWER(email) = %s", (email,))
-        user = cur.fetchone()
-        cur.close()
+        conn = sqlite3.connect("users.db")
+        conn.row_factory = sqlite3.Row
+        user = conn.execute("SELECT * FROM users WHERE LOWER(email) = ?", (email,)).fetchone()
         conn.close()
 
-        if not user or not user.get("password"):
+        if not user or not user["password"]:
             flash("Invalid email or password", "error")
             return redirect(url_for("login_admin"))
 
@@ -2060,14 +2121,15 @@ def login_admin():
             flash("Invalid email or password", "error")
             return redirect(url_for("login_admin"))
 
-        if user["role"] not in ("admin", "owner"):
+        db_role = user["role"] if "role" in user.keys() else "user"
+        if db_role not in ("admin", "owner"):
             flash("You are not authorized to log in as Admin/Owner.", "error")
             return redirect(url_for("login_admin"))
 
         session["user_id"] = user["id"]
         session["user"] = {
             "email": user["email"],
-            "role": user["role"],
+            "role": db_role,
             "name": user["full_name"]
         }
 
@@ -2080,23 +2142,21 @@ def logout():
     user = session.get("user")
     role = user.get("role") if user else None
 
-    # Clear session
     session.pop("user", None)
     session.pop("user_id", None)
 
-    # Redirect admin/owner to admin login
+    # Redirect for admin/owner
     if role in ("admin", "owner"):
         return redirect(url_for("login_admin"))
 
-    # Check for mobile user
+    # Detect if mobile user
     user_agent = request.headers.get('User-Agent', '').lower()
     is_mobile = "mobi" in user_agent or "android" in user_agent or "iphone" in user_agent
 
-    # Redirect accordingly
     if is_mobile:
         return redirect("/mobile")
-    return redirect(url_for("login_user", open_login="true"))
+    else:
+        return redirect(url_for("login_user", open_login="true"))
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Use Railway's provided port
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(debug=True)
