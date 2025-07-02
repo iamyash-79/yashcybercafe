@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ products['name'] }}</title>
+  <title>{{ product['name'] }}</title>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -22,7 +22,7 @@
   </style>
 </head>
 
-<body class="h-full min-h-screen text-base md:text-lg" x-data="productsPage" x-init="init()">
+<body class="h-full min-h-screen text-base md:text-lg" x-data="productPage" x-init="init()">
 
   <!-- Floating Back Button -->
   <a href="/home" class="floating-back bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg shadow-lg">
@@ -34,20 +34,20 @@
     <!-- Left Side: Desktop Image Gallery -->
     <div class="w-full md:w-1/3 bg-gray-900 relative hidden md:flex items-center justify-center overflow-hidden md:sticky md:top-0 md:h-screen">
       <button @click="prevImage()" class="absolute left-4 bg-gray-800 text-white p-2 rounded-full hover:bg-gray-700">⬅</button>
-      <img :src="`${basePath}${images[currentImageIndex]}`" alt="products Image"
+      <img :src="`${basePath}${images[currentImageIndex]}`" alt="Product Image"
            class="h-[500px] w-auto object-contain rounded-lg transition duration-500 cursor-pointer"
            @click="openImagePopup(`${basePath}${images[currentImageIndex]}`)">
       <button @click="nextImage()" class="absolute right-4 bg-gray-800 text-white p-2 rounded-full hover:bg-gray-700">➡</button>
     </div>
 
-    <!-- Right Side: products Details -->
+    <!-- Right Side: Product Details -->
     <div class="w-full md:w-2/3 overflow-y-auto p-4 md:p-8 space-y-6">
 
       <!-- Mobile Image Gallery -->
       <div class="w-full bg-gray-900 md:hidden flex flex-col items-center mb-4">
         <div class="overflow-x-auto scroll-images flex snap-x snap-mandatory space-x-4 p-4" x-ref="mobileSlider" @scroll="handleScroll">
           <template x-for="(image, index) in images" :key="index">
-            <img :src="`${basePath}${image}`" alt="products Image"
+            <img :src="`${basePath}${image}`" alt="Product Image"
                  class="h-[300px] min-w-full object-contain rounded-lg snap-center cursor-pointer"
                  @click="openImagePopup(`${basePath}${image}`)">
           </template>
@@ -60,16 +60,16 @@
         </div>
       </div>
 
-      <!-- products Details -->
-      <h2 class="text-2xl md:text-4xl font-bold text-cyan-300 mb-6">{{ products['name'] }}</h2>
+      <!-- Product Details -->
+      <h2 class="text-2xl md:text-4xl font-bold text-cyan-300 mb-6">{{ product['name'] }}</h2>
 
       <h4 class="text-cyan-400 font-semibold text-base md:text-lg mb-2">Price</h4>
       <div class="mb-6">
-        {% if products['discount_price'] and products['discount_price']|float < products['price']|float %}
-          <span class="text-red-400 line-through text-xl md:text-2xl mr-2">₹{{ products['price'] }}</span>
-          <span class="text-green-300 text-2xl md:text-4xl font-bold">₹{{ products['discount_price'] }}</span>
+        {% if product['discount_price'] and product['discount_price']|float < product['price']|float %}
+          <span class="text-red-400 line-through text-xl md:text-2xl mr-2">₹{{ product['price'] }}</span>
+          <span class="text-green-300 text-2xl md:text-4xl font-bold">₹{{ product['discount_price'] }}</span>
         {% else %}
-          <span class="text-cyan-200 text-2xl md:text-4xl font-bold">₹{{ products['price'] }}</span>
+          <span class="text-cyan-200 text-2xl md:text-4xl font-bold">₹{{ product['price'] }}</span>
         {% endif %}
       </div>
 
@@ -77,7 +77,7 @@
        <h4 class="text-cyan-400 font-semibold text-base md:text-lg leading-none mb-1">Description</h4>
        <p class="text-cyan-100 text-base md:text-lg whitespace-pre-line leading-tight m-0 p-0"
          :class="{'line-clamp-5': !showFullDescription}">
-         {{ products['description'] }}
+         {{ product['description'] }}
        </p>
       <template x-if="isLongDescription">
       <button class="text-cyan-400 text-sm underline mt-1" @click="showFullDescription = !showFullDescription">
@@ -105,7 +105,7 @@
     <div class="bg-gray-900 w-full max-w-md p-4 rounded-xl relative border border-cyan-500">
       <button @click="showOrderModal = false" class="absolute top-3 right-4 text-xl text-cyan-300 hover:text-red-500">&times;</button>
       <h2 class="text-xl font-bold mb-4 text-center text-cyan-300">Place Your Order</h2>
-      <form method="POST" :action="`/submit_order/${productsData.id}`" @submit="return validateOrderForm()">
+      <form method="POST" :action="`/submit_order/${productData.id}`" @submit="return validateOrderForm()">
         <div class="grid grid-cols-1 gap-3">
           <input type="text" name="name" placeholder="Full Name" required class="border border-cyan-500 rounded p-2 bg-transparent text-white placeholder-cyan-400 text-sm">
           <input type="text" name="contact" placeholder="Contact Number" required class="border border-cyan-500 rounded p-2 bg-transparent text-white placeholder-cyan-400 text-sm">
@@ -136,15 +136,15 @@
   </div>
 
   <!-- Embedded JSON -->
-  <script id="products-data" type="application/json">{{ products | tojson }}</script>
-  <script id="image-list" type="application/json">{{ products['images'] | tojson }}</script>
+  <script id="product-data" type="application/json">{{ product | tojson }}</script>
+  <script id="image-list" type="application/json">{{ product['images'] | tojson }}</script>
 
   <!-- Alpine.js Logic -->
   <script>
     document.addEventListener('alpine:init', () => {
-      Alpine.data('productsPage', () => ({
+      Alpine.data('productPage', () => ({
         basePath: '{{ url_for("static", filename="uploads/products/") }}',
-        productsData: null,
+        productData: null,
         images: [],
         quantity: 1,
         totalPrice: 0,
@@ -157,23 +157,23 @@
         isLongDescription: false,
 
         init() {
-          const productsJSON = document.getElementById('products-data').textContent;
+          const productJSON = document.getElementById('product-data').textContent;
           const imagesJSON = document.getElementById('image-list').textContent;
-          this.productsData = JSON.parse(productsJSON);
+          this.productData = JSON.parse(productJSON);
           this.images = JSON.parse(imagesJSON);
 
-          let hasDiscount = this.productsData.discount_price && parseFloat(this.productsData.discount_price) < parseFloat(this.productsData.price);
-          this.totalPrice = hasDiscount ? parseFloat(this.productsData.discount_price) : parseFloat(this.productsData.price);
+          let hasDiscount = this.productData.discount_price && parseFloat(this.productData.discount_price) < parseFloat(this.productData.price);
+          this.totalPrice = hasDiscount ? parseFloat(this.productData.discount_price) : parseFloat(this.productData.price);
 
           // Check if description is long (more than 5 line breaks)
-          const desc = this.productsData.description || '';
+          const desc = this.productData.description || '';
           this.isLongDescription = (desc.match(/\n/g) || []).length > 4;
         },
 
         updateTotalPrice() {
-          let unitPrice = this.productsData.discount_price && parseFloat(this.productsData.discount_price) < parseFloat(this.productsData.price)
-            ? parseFloat(this.productsData.discount_price)
-            : parseFloat(this.productsData.price);
+          let unitPrice = this.productData.discount_price && parseFloat(this.productData.discount_price) < parseFloat(this.productData.price)
+            ? parseFloat(this.productData.discount_price)
+            : parseFloat(this.productData.price);
           let qty = parseInt(this.quantity);
           if (isNaN(qty) || qty < 1) qty = 1;
           this.totalPrice = unitPrice * qty;

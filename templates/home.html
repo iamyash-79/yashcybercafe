@@ -44,15 +44,15 @@
 
       <div class="h-[75vh] overflow-y-auto pr-1 sm:pr-2">
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-          {% for item in products_items %}
-          <a href="{{ url_for('cart', products_id=item.id) }}" 
+          {% for item in product_items %}
+          <a href="{{ url_for('cart', product_id=item.id) }}" 
              class="glass rounded-xl p-2 flex flex-col items-center relative text-white shadow-md hover:shadow-cyan-500/30 transition duration-300 w-full max-w-[200px] mx-auto cursor-pointer">
 
             <div class="w-full mb-2 relative min-h-[140px] flex items-center justify-center bg-white rounded border border-cyan-500 overflow-hidden">
               {% if item.images %}
                 <img 
                   src="{{ url_for('static', filename='uploads/products/' ~ item.images[0]) }}" 
-                  alt="products Image"
+                  alt="Product Image"
                   class="w-full h-[130px] object-contain bg-white p-1 transition duration-300 hover:scale-105"
                 />
               {% else %}

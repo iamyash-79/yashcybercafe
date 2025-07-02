@@ -535,29 +535,29 @@
   }
 </style>
 
-  <section id="products" class="products-section">
+  <section id="products" class="product-section">
   <h2 style="color: #00ffe5; text-align: center; text-shadow: 0 0 6px #00ffe5; margin-bottom: 20px;">Explore Products</h2>
-  <div class="scroll-wrapper" id="productsScrollWrapper" style="overflow:hidden; width: 100%;">
-    <div class="products-container" id="productsScroll">
-      {% for products in products_items %}
-      <a href="{{ url_for('home') }}" class="products-card" style="text-decoration: none; color: inherit;">
-        {% if products.image_url %}
-          <img src="{{ url_for('static', filename='uploads/products/' ~ products.image_url) }}" alt="{{ products.name }}">
+  <div class="scroll-wrapper" id="productScrollWrapper" style="overflow:hidden; width: 100%;">
+    <div class="product-container" id="productScroll">
+      {% for product in product_items %}
+      <a href="{{ url_for('home') }}" class="product-card" style="text-decoration: none; color: inherit;">
+        {% if product.image_url %}
+          <img src="{{ url_for('static', filename='uploads/products/' ~ product.image_url) }}" alt="{{ product.name }}">
         {% else %}
           <img src="{{ url_for('static', filename='uploads/products/default.jpg') }}" alt="No Image">
         {% endif %}
-        <h3>{{ products.name }}</h3>
+        <h3>{{ product.name }}</h3>
       </a>
       {% endfor %}
       <!-- Duplicate for seamless loop -->
-      {% for products in products_items %}
-      <a href="{{ url_for('home') }}" class="products-card" style="text-decoration: none; color: inherit;">
-        {% if products.image_url %}
-          <img src="{{ url_for('static', filename='uploads/products/' ~ products.image_url) }}" alt="{{ products.name }}">
+      {% for product in product_items %}
+      <a href="{{ url_for('home') }}" class="product-card" style="text-decoration: none; color: inherit;">
+        {% if product.image_url %}
+          <img src="{{ url_for('static', filename='uploads/products/' ~ product.image_url) }}" alt="{{ product.name }}">
         {% else %}
           <img src="{{ url_for('static', filename='uploads/products/default.jpg') }}" alt="No Image">
         {% endif %}
-        <h3>{{ products.name }}</h3>
+        <h3>{{ product.name }}</h3>
       </a>
       {% endfor %}
     </div>
@@ -565,7 +565,7 @@
 </section>
 
 <style>
-  .products-section {
+  .product-section {
     padding: 3rem 2rem;
     background: rgba(0, 255, 255, 0.05);
     backdrop-filter: blur(8px);
@@ -573,7 +573,7 @@
     border-bottom: 2px solid #00ffe5;
   }
 
-  .products-container {
+  .product-container {
     display: flex;
     gap: 1rem;
     padding: 1rem;
@@ -581,7 +581,7 @@
     animation: scroll-loop 10s linear infinite;
   }
 
-  .products-container.paused {
+  .product-container.paused {
     animation-play-state: paused;
   }
 
@@ -590,11 +590,11 @@
     100% { transform: translateX(-50%); }
   }
 
-  .products-container::-webkit-scrollbar {
+  .product-container::-webkit-scrollbar {
     display: none;
   }
 
-  .products-card {
+  .product-card {
     flex: 0 0 auto;
     width: 200px;
     background: rgba(255, 255, 255, 0.05);
@@ -607,12 +607,12 @@
     transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
 
-  .products-card:hover {
+  .product-card:hover {
     transform: translateY(-8px);
     box-shadow: 0 0 15px #00ffe5;
   }
 
-  .products-card img {
+  .product-card img {
     max-width: 100%;
     height: 140px;
     object-fit: contain;
@@ -620,7 +620,7 @@
     margin-bottom: 0.5rem;
   }
 
-  .products-card h3 {
+  .product-card h3 {
     font-size: 0.85rem;
     color: #aef9ff;
     text-shadow: 0 0 4px #00e5ff;
@@ -633,7 +633,7 @@
     height: 2.4em;
   }
 
-  .products-card p {
+  .product-card p {
     color: #fff;
     font-weight: bold;
     font-size: 1rem;
@@ -641,31 +641,31 @@
   }
 
   @media (max-width: 768px) {
-    .products-card {
+    .product-card {
       width: 160px;
       padding: 0.8rem;
     }
 
-    .products-card img {
+    .product-card img {
       height: 120px;
     }
 
-    .products-card h3 {
+    .product-card h3 {
       font-size: 0.75rem;
     }
 
-    .products-card p {
+    .product-card p {
       font-size: 0.9rem;
     }
   }
 </style>
 <script>
   const scrollContainer = document.getElementById('serviceScroll');
-  const productsContainer = document.getElementById('productsScroll');
+  const productContainer = document.getElementById('productScroll');
 
   // Separate timers for each container
   let touchTimerScroll;
-  let touchTimerproducts;
+  let touchTimerProduct;
 
   // --- serviceScroll handlers ---
   scrollContainer.addEventListener('mouseenter', () => {
@@ -691,27 +691,27 @@
     }, 3000);
   });
 
-  // --- productsScroll handlers ---
-  productsContainer.addEventListener('mouseenter', () => {
-    productsContainer.classList.add('paused');
+  // --- productScroll handlers ---
+  productContainer.addEventListener('mouseenter', () => {
+    productContainer.classList.add('paused');
   });
-  productsContainer.addEventListener('mouseleave', () => {
-    productsContainer.classList.remove('paused');
+  productContainer.addEventListener('mouseleave', () => {
+    productContainer.classList.remove('paused');
   });
-  productsContainer.addEventListener('touchstart', () => {
-    productsContainer.classList.add('paused');
-    clearTimeout(touchTimerproducts);
+  productContainer.addEventListener('touchstart', () => {
+    productContainer.classList.add('paused');
+    clearTimeout(touchTimerProduct);
   });
-  productsContainer.addEventListener('touchend', () => {
-    touchTimerproducts = setTimeout(() => {
-      productsContainer.classList.remove('paused');
+  productContainer.addEventListener('touchend', () => {
+    touchTimerProduct = setTimeout(() => {
+      productContainer.classList.remove('paused');
     }, 3000);
   });
-  productsContainer.addEventListener('scroll', () => {
-    productsContainer.classList.add('paused');
-    clearTimeout(touchTimerproducts);
-    touchTimerproducts = setTimeout(() => {
-      productsContainer.classList.remove('paused');
+  productContainer.addEventListener('scroll', () => {
+    productContainer.classList.add('paused');
+    clearTimeout(touchTimerProduct);
+    touchTimerProduct = setTimeout(() => {
+      productContainer.classList.remove('paused');
     }, 3000);
   });
 </script>
@@ -790,7 +790,7 @@
       {% if messages %}
         {% for category, message in messages %}
           {% if category.startswith("login_") %}
-            <div class="flash-message 
+            <div class="flash-message
               {% if category == 'login_error' %} flash-error
               {% elif category == 'login_success' %} flash-success
               {% else %} flash-info {% endif %}">
@@ -820,7 +820,7 @@
     </form>
 
     <p style="margin-top: 1rem; text-align: center;">
-      Not registered? 
+      Not registered?
       <button type="button" onclick="openRegisterModal()" class="link-hover btn-link">
         Click here
       </button>
@@ -855,7 +855,7 @@
     {% endwith %}
 
     <form action="{{ url_for('register') }}" method="POST" enctype="multipart/form-data" autocomplete="off" style="font-size: 14px;">
-      
+
       <!-- Full Name -->
       <label for="full_name">Full Name</label>
       <input type="text" id="full_name" name="full_name" required placeholder="Full name"

@@ -179,11 +179,11 @@
 
           <label for="question">Security Question <span style="color:red">*</span></label>
           <select id="question" name="question" required>
-  <option value="">-- Select a question --</option>
-  {% for q in questions %}
-    <option value="{{ q['question'] }}">{{ q['question'] }}</option>
-  {% endfor %}
-</select>
+            <option value="">-- Select a question --</option>
+            {% for q in questions %}
+              <option value="{{ q[1] }}">{{ q[1] }}</option>
+            {% endfor %}
+          </select>
 
           <label for="answer">Your Answer <span style="color:red">*</span></label>
           <input type="text" id="answer" name="answer" required placeholder="Answer to security question" />

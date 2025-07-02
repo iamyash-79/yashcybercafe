@@ -59,7 +59,7 @@
       <div class="flex flex-col items-center justify-center space-y-2">
         <label for="image-upload" class="cursor-pointer relative group">
           {% if user.profile_image %}
-            <img src="{{ url_for('static', filename='uploads/' + user.profile_image) }}" class="w-32 h-32 rounded-full border-2 border-cyan-300 object-cover" />
+            <img src="{{ user.profile_image }}" class="w-32 h-32 rounded-full border-2 border-cyan-300 object-cover" />
           {% else %}
             {% if user.gender_id|int == 2 %}
               <img src="{{ url_for('static', filename='images/default_female.png') }}" class="w-32 h-32 rounded-full border-2 border-cyan-300" />
@@ -129,10 +129,10 @@
       <div>
         <label class="text-sm text-cyan-400 block mb-1">Select Question</label>
         <select name="question" required class="w-full px-3 py-2 rounded-md bg-[#1e293b] border border-cyan-500/30 text-white">
-  {% for q in questions %}
-    <option value="{{ q['question'] }}" {% if user.security_question == q['question'] %}selected{% endif %}>{{ q['question'] }}</option>
-  {% endfor %}
-</select>
+          {% for q in questions %}
+            <option value="{{ q[1] }}" {% if user.security_question == q[1] %}selected{% endif %}>{{ q[1] }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div>
         <label class="text-sm text-cyan-400 block mb-1">Your Answer</label>

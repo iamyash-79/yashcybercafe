@@ -52,10 +52,10 @@
       <!-- If logged in -->
       <button @click="openProfile = !openProfile" class="focus:outline-none rounded-full overflow-hidden">
         <img
-          src="{% if user.profile_image %}{{ url_for('static', filename='uploads/' + user.profile_image) }}{% elif user.gender_id == 2 %}{{ url_for('static', filename='images/default_female.png') }}{% else %}{{ url_for('static', filename='images/default_male.png') }}{% endif %}"
-          alt="Profile"
-          class="w-10 h-10 object-cover rounded-full border border-cyan-400"
-        />
+        src="{{ user.profile_image if user.profile_image else (url_for('static', filename='images/default_female.png') if user.gender_id == 2 else url_for('static', filename='images/default_male.png')) }}"
+        alt="Profile"
+        class="w-10 h-10 object-cover rounded-full border border-cyan-400"
+       />
       </button>
 
       <div
@@ -66,10 +66,10 @@
         class="absolute mt-2 right-0 w-72 dropdown-box text-white rounded-xl p-4">
         <div class="flex items-center space-x-3 mb-4">
           <img
-            src="{% if user.profile_image %}{{ url_for('static', filename='uploads/' + user.profile_image) }}{% elif user.gender_id == 2 %}{{ url_for('static', filename='images/default_female.png') }}{% else %}{{ url_for('static', filename='images/default_male.png') }}{% endif %}"
-            alt="Profile"
-            class="w-10 h-10 object-cover rounded-full border border-cyan-400"
-          />
+        src="{{ user.profile_image if user.profile_image else (url_for('static', filename='images/default_female.png') if user.gender_id == 2 else url_for('static', filename='images/default_male.png')) }}"
+        alt="Profile"
+        class="w-10 h-10 object-cover rounded-full border border-cyan-400"
+       />
           <div>
             <div class="font-semibold leading-tight text-cyan-300">{{ user.name }}</div>
             <div class="text-sm text-cyan-100 truncate max-w-[12rem]">{{ user.email }}</div>
@@ -89,10 +89,10 @@
       <!-- If guest -->
        <button @click="openProfile = !openProfile" class="focus:outline-none rounded-full overflow-hidden">
         <img
-          src="{% if user.profile_image %}{{ url_for('static', filename='uploads/' + user.profile_image) }}{% elif user.gender_id == 2 %}{{ url_for('static', filename='images/default_female.png') }}{% else %}{{ url_for('static', filename='images/default_male.png') }}{% endif %}"
-          alt="Profile"
-          class="w-10 h-10 object-cover rounded-full border border-cyan-400"
-        />
+        src="{{ user.profile_image if user.profile_image else (url_for('static', filename='images/default_female.png') if user.gender_id == 2 else url_for('static', filename='images/default_male.png')) }}"
+        alt="Profile"
+        class="w-10 h-10 object-cover rounded-full border border-cyan-400"
+       />
       </button>
 
       <div
@@ -103,10 +103,10 @@
         class="absolute mt-2 right-0 w-72 dropdown-box text-white rounded-xl p-4">
         <div class="flex items-center space-x-3 mb-4">
           <img
-            src="{% if user.profile_image %}{{ url_for('static', filename='uploads/' + user.profile_image) }}{% elif user.gender_id == 2 %}{{ url_for('static', filename='images/default_female.png') }}{% else %}{{ url_for('static', filename='images/default_male.png') }}{% endif %}"
-            alt="Profile"
-            class="w-10 h-10 object-cover rounded-full border border-cyan-400"
-          />
+        src="{{ user.profile_image if user.profile_image else (url_for('static', filename='images/default_female.png') if user.gender_id == 2 else url_for('static', filename='images/default_male.png')) }}"
+        alt="Profile"
+        class="w-10 h-10 object-cover rounded-full border border-cyan-400"
+       />
           <div>
             <div class="font-semibold leading-tight text-cyan-300">{{ user.name }}</div>
             <div class="text-sm text-cyan-100 truncate max-w-[12rem]">{{ user.email }}</div>
@@ -150,7 +150,7 @@
         <li><a href="/home" class="flex items-center space-x-3 hover-glow {{ 'text-cyan-300 font-semibold' if request.path == '/home' else '' }}">🏠<span>Home</span></a></li>
         {% if user.role in ['admin', 'owner'] %}
         <li><a href="/orders" class="flex items-center space-x-3 hover-glow {{ 'text-cyan-300 font-semibold' if request.path == '/orders' else '' }}">📅<span>Orders</span></a></li>
-        <li><a href="/products" class="flex items-center space-x-3 hover-glow {{ 'text-cyan-300 font-semibold' if request.path.startswith('/products') or request.path.startswith('/services') else '' }}">📚<span>Products</span></a></li>
+        <li><a href="/product" class="flex items-center space-x-3 hover-glow {{ 'text-cyan-300 font-semibold' if request.path.startswith('/product') or request.path.startswith('/services') else '' }}">📚<span>Product</span></a></li>
         <li><a href="/sales" class="flex items-center space-x-3 hover-glow {{ 'text-cyan-300 font-semibold' if request.path == '/sales' else '' }}">💰<span>Sales</span></a></li>
         {% endif %}
         {% if not user or user.role not in ['admin', 'owner'] %}
@@ -175,7 +175,7 @@
     <a href="/orders" class="flex flex-col items-center justify-center w-12 h-12 hover-glow {{ 'text-cyan-300' if request.path == '/orders' else 'text-cyan-100' }}" aria-label="Orders">
       <span class="text-2xl">📅</span>
     </a>
-    <a href="/products" class="flex flex-col items-center justify-center w-12 h-12 hover-glow {{ 'text-cyan-300' if request.path.startswith('/products') or request.path.startswith('/services') else 'text-cyan-100' }}" aria-label="products">
+    <a href="/product" class="flex flex-col items-center justify-center w-12 h-12 hover-glow {{ 'text-cyan-300' if request.path.startswith('/product') or request.path.startswith('/services') else 'text-cyan-100' }}" aria-label="Product">
       <span class="text-2xl">📚</span>
     </a>
      <a href="/sales" class="flex flex-col items-center justify-center w-12 h-12 hover-glow {{ 'text-cyan-300' if request.path == '/sales' else 'text-cyan-100' }}" aria-label="Sales">
