@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YourStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .scroll-images::-webkit-scrollbar { display: none; }
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen" x-data="productPage" x-init="init()">
+
+  {% include 'user_topbar.html' %}
+
+  <!-- ✅ Mobile Image Scroll -->
+  <div class="md:hidden bg-white px-4 pt-28">
+    <div class="overflow-x-auto flex space-x-4 scroll-images pb-2">
+      <template x-for="(img, i) in images">
+        <img :src="`${basePath}${img}`" class="h-48 min-w-[200px] object-contain rounded shadow"
+             @click="currentImageIndex = i">
+      </template>
+    </div>
+  </div>
+
+  <!-- ✅ Main Content -->
+  <main class="flex flex-col md:flex-row pt-24 pb-10 px-4">
+
+    <!-- Left: Large Image (Desktop only) -->
+    <div class="hidden md:flex w-full md:w-1/2 p-4 bg-white flex-col items-center sticky top-20 max-h-screen overflow-hidden rounded-lg">
+      <div class="relative w-full flex justify-center">
+        <button @click="prevImage" class="absolute left-2 top-1/2 transform -translate-y-1/2 bg-gray-200 text-gray-700 rounded-full p-2 hover:bg-gray-300">◀</button>
+        <img :src="`${basePath}${images[currentImageIndex]}`" class="max-h-[500px] object-contain rounded shadow" alt="Product Image">
+        <button @click="nextImage" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gray-200 text-gray-700 rounded-full p-2 hover:bg-gray-300">▶</button>
+      </div>
+      <div class="flex mt-4 space-x-2">
+        <template x-for="(img, i) in images">
+          <img :src="`${basePath}${img}`" class="w-16 h-16 object-cover rounded border cursor-pointer"
+               :class="{'ring-2 ring-indigo-500': i === currentImageIndex}"
+               @click="currentImageIndex = i">
+        </template>
+      </div>
+    </div>
+
+    <!-- Right: Product Info -->
+    <div class="w-full md:w-1/2 p-6 space-y-6 bg-gray-50 rounded-lg">
+      <h1 class="text-3xl font-bold text-indigo-700">{{ product['name'] }}</h1>
+
+      <!-- Price -->
+      <div>
+        <p class="text-sm text-gray-600 mb-1">Price</p>
+        {% if product['discount_price'] and product['discount_price']|float < product['price']|float %}
+          <div class="text-2xl font-bold text-green-600">₹{{ product['discount_price'] }}
+            <span class="text-sm text-red-500 line-through ml-2">₹{{ product['price'] }}</span>
+          </div>
+        {% else %}
+          <div class="text-2xl font-bold text-gray-800">₹{{ product['price'] }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Description -->
+      <div>
+        <p class="text-sm text-gray-600 mb-1">Description</p>
+        <p class="text-gray-700 leading-relaxed whitespace-pre-line" :class="{'line-clamp-5': !showFullDescription}">
+          {{ product['description'] }}
+        </p>
+        <template x-if="isLongDescription">
+          <button @click="showFullDescription = !showFullDescription" class="text-indigo-600 text-sm underline mt-1">
+            <span x-text="showFullDescription ? 'Show Less' : 'Show More'"></span>
+          </button>
+        </template>
+      </div>
+
+      <!-- ✅ Action Buttons -->
+      <div class="flex justify-center sm:justify-start gap-4 flex-nowrap">
+        <button @click="handleAddToCart"
+                class="flex-1 sm:flex-none bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-6 rounded-lg text-base font-medium transition whitespace-nowrap">
+          ➕ Add to Cart
+        </button>
+        <button @click="handleBuyNow"
+                class="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-6 rounded-lg text-base font-medium transition whitespace-nowrap">
+          🛒 Order Now
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ✅ Footer (Visible Only on Desktop) -->
+  <div class="hidden md:block">
+    {% include 'user_footer.html' %}
+  </div>
+
+  <!-- ✅ Login check flag -->
+  <script>
+    const IS_LOGGED_IN = {{ 'true' if user else 'false' }};
+  </script>
+
+  <!-- JSON Data -->
+  <script id="product-data" type="application/json">{{ product | tojson }}</script>
+  <script id="image-list" type="application/json">{{ product['images'] | tojson }}</script>
+
+  <!-- Alpine.js Logic -->
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('productPage', () => ({
+        basePath: '{{ url_for("static", filename="uploads/products/") }}',
+        productData: null,
+        images: [],
+        currentImageIndex: 0,
+        showFullDescription: false,
+        isLongDescription: false,
+
+        init() {
+          this.productData = JSON.parse(document.getElementById('product-data').textContent);
+          this.images = JSON.parse(document.getElementById('image-list').textContent);
+
+          const desc = this.productData.description || '';
+          this.isLongDescription = (desc.match(/\n/g) || []).length > 4;
+        },
+
+        prevImage() {
+          if (this.currentImageIndex > 0) this.currentImageIndex--;
+        },
+
+        nextImage() {
+          if (this.currentImageIndex < this.images.length - 1) this.currentImageIndex++;
+        },
+
+        handleAddToCart() {
+          if (!IS_LOGGED_IN) {
+            this.openLoginModal();
+            return;
+          }
+          const productId = this.productData.id;
+          fetch(`/add_to_cart/${productId}`)
+            .then(res => res.json())
+            .then(data => {
+              alert(data.message || 'Added to cart!');
+            }).catch(() => {
+              alert('Something went wrong.');
+            });
+        },
+
+        handleBuyNow() {
+          if (!IS_LOGGED_IN) {
+            this.openLoginModal();
+            return;
+          }
+          const productId = this.productData.id;
+          window.location.href = `/user_checkout/${productId}`;
+        },
+
+        openLoginModal() {
+          const modal = document.getElementById("loginModal");
+          if (modal) modal.classList.remove("hidden");
+        }
+      }))
+    });
+  </script>
+</body>
+</html>

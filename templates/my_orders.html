@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Orders - {{ full_name }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/alpinejs" defer></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    body {
+      background: #0f172a;
+      color: #e0f7fa;
+    }
+    .btn-neon {
+      background-color: #00bcd4;
+      color: white;
+      border: none;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 10px #00bcd4, 0 0 20px #00bcd4;
+    }
+    .btn-neon:hover {
+      background-color: #0288d1;
+      box-shadow: 0 0 20px #0288d1, 0 0 30px #0288d1;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen bg-[#0f172a] text-cyan-100" x-data="myOrdersApp()">
+  <div class="flex h-full">
+    <div class="fixed top-0 left-0 z-50">
+    </div>
+
+    <main class="w-full pt-24 px-4 sm:px-6 md:pl-60 overflow-x-auto">
+      <h1 class="text-3xl font-bold mb-6 text-cyan-400">My Orders</h1>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-4">
+            {% for category, message in messages %}
+              <div class="p-3 rounded text-white 
+                          {% if category == 'success' %}bg-green-800{% elif category == 'error' %}bg-red-800{% else %}bg-blue-800{% endif %}">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <div class="space-y-4">
+        {% for order in my_orders %}
+        <a href="{{ url_for('my_orders2', order_id=order.id) }}" class="block">
+          <div class="bg-[#0f1a2b] rounded-lg p-4 flex items-center justify-between hover:shadow-cyan-500 transition hover:shadow-md">
+            <img src="{{ url_for('static', filename='uploads/products/' + order.image) }}"
+              alt="Product Image"
+              class="h-20 w-20 object-contain rounded-md">
+
+            <div class="ml-4 flex flex-col justify-between text-sm flex-grow">
+              <div class="font-semibold
+                {% if order.status == 'cancelled' %}text-red-400
+                {% elif order.status == 'delivered' %}text-blue-400
+                {% elif order.status == 'pending' %}text-amber-300
+                {% else %}text-cyan-300{% endif %}">
+                {% if order.status == 'pending' %}
+                  Pending Payment
+                {% elif order.status == 'cancelled' %}
+                  Order Cancelled
+                {% elif order.status == 'delivered' %}
+                  Delivered
+                {% else %}
+                  {{ order.status|capitalize }}
+                {% endif %}
+              </div>
+
+              <div class="text-cyan-200 mt-1 text-sm">
+                ₹{{ order.amount }} 
+                {% if order.status == 'delivered' %}
+                  paid 
+                {% else %}
+                  to pay 
+                {% endif %}
+                on 
+                {% if order.created_at_obj.__class__.__name__ == 'datetime' %}
+                  {{ order.created_at_obj.strftime('%a, %d %b') }}
+                {% else %}
+                  {{ order.created_at_obj }}
+                {% endif %}
+              </div>
+
+              <div class="text-cyan-500 mt-1 text-xs">
+                Qty: {{ order.quantity or 1 }}
+              </div>
+            </div>
+
+            <div class="ml-auto">
+              {% if order.status == 'pending' %}
+                <button 
+                  @click.stop.prevent="handlePayment({{ order.id }})"
+                  class="btn-neon text-xs px-3 py-1 rounded">
+                  Pay Now
+                </button>
+              {% else %}
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-400" fill="none"
+                  viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 5l7 7-7 7" />
+                </svg>
+              {% endif %}
+            </div>
+          </div>
+        </a>
+        {% else %}
+        <div class="text-center text-cyan-500">No orders found.</div>
+        {% endfor %}
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const ALL_ORDERS = JSON.parse(`{{ my_orders | tojson | safe }}`);
+
+    function myOrdersApp() {
+      return {
+        handlePayment(orderId) {
+          const order = ALL_ORDERS.find(o => o.id === orderId);
+          if (!order) return;
+
+          fetch(`/create_razorpay_order/${orderId}`)
+            .then(res => res.json())
+            .then(data => {
+              const options = {
+                key: "rzp_live_8teFtytXqXhxwa",
+                amount: data.amount,
+                currency: "INR",
+                name: "Yash Cyber Cafe",
+                description: "Order Payment",
+                order_id: data.razorpay_order_id,
+                handler: function (response) {
+                  fetch(`/payment_success`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      razorpay_payment_id: response.razorpay_payment_id,
+                      razorpay_order_id: response.razorpay_order_id,
+                      razorpay_signature: response.razorpay_signature,
+                      order_id: orderId
+                    })
+                  }).then(() => window.location.reload());
+                },
+                theme: { color: "#00bcd4" }
+              };
+              const rzp = new Razorpay(options);
+              rzp.open();
+            });
+        }
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YourStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8f9fa;
+      color: #343a40;
+    }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen" x-data="homePage">
+
+  <!-- ✅ Header -->
+  {% include 'user_topbar.html' %}
+
+  <!-- ✅ Hero Section -->
+  <section class="bg-gradient-to-r from-indigo-50 to-purple-50 py-20 text-center rounded-b-3xl shadow-lg mt-4 max-w-7xl mx-auto w-full px-4">
+    <h1 class="text-4xl md:text-6xl font-extrabold text-gray-800 mb-6">Discover Your Next Favorite Thing</h1>
+    <p class="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">Explore our curated collection of high-quality products, hand-picked just for you.</p>
+    <a href="/user_shop" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:bg-indigo-700 transform hover:scale-105 transition-all">Shop Now</a>
+  </section>
+
+  <!-- ✅ Product Section -->
+  <section class="py-16 px-4 max-w-7xl mx-auto w-full">
+    <h2 class="text-4xl font-bold text-center text-gray-800 mb-12">Featured Products</h2>
+
+    <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+      {% for item in product_items[:5] %}
+      <div class="bg-white rounded-xl shadow hover:shadow-lg overflow-hidden transform hover:scale-105 transition duration-300 flex flex-col">
+        <a href="{{ url_for('user_products_details', product_id=item.id) }}">
+          <div class="relative w-full" style="padding-top: 100%; background-color: #f3f4f6;">
+            <img src="{{ url_for('static', filename='uploads/products/' ~ item.images[0]) if item.images else 'https://placehold.co/400x400?text=No+Image' }}"
+                 alt="{{ item.name }}"
+                 class="absolute inset-0 w-full h-full object-contain p-4">
+          </div>
+        </a>
+        <div class="p-4 flex flex-col justify-between flex-grow">
+          <div class="mb-3">
+            <h3 class="text-base font-semibold text-gray-800 truncate mb-1">{{ item.name }}</h3>
+            {% if item.discount_price and item.discount_price | float > 0 %}
+            <div>
+              <span class="line-through text-red-500 text-sm">₹{{ item.price }}</span>
+              <span class="text-lg font-bold text-green-600 ml-2">₹{{ item.discount_price }}</span>
+            </div>
+            {% else %}
+            <div class="text-lg font-bold text-indigo-600">₹{{ item.price }}</div>
+            {% endif %}
+          </div>
+          <div class="mt-auto flex justify-between gap-2">
+            <button @click="addToCart({{ item.id }})"
+                    class="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 text-sm">
+              ➕ Add
+            </button>
+            <button @click="buyNow({{ item.id }})"
+                    class="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 text-sm">
+              🛒 Buy
+            </button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- View More -->
+    {% if product_items|length > 5 %}
+    <div class="text-center mt-10">
+      <a href="/user_shop" class="bg-indigo-600 text-white px-6 py-2 rounded-full hover:bg-indigo-700 transition">
+        View More
+      </a>
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- ✅ Footer -->
+  <div class="hidden md:block">
+    {% include 'user_footer.html' %}
+  </div>
+
+  <!-- ✅ Inject IS_LOGGED_IN -->
+  <script>
+    const IS_LOGGED_IN = {{ 'true' if user else 'false' }};
+  </script>
+
+  <!-- ✅ AlpineJS Logic -->
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('homePage', () => ({
+        addToCart(productId) {
+          if (!IS_LOGGED_IN) {
+            const modal = document.getElementById("loginModal");
+            if (modal) modal.classList.remove("hidden");
+            return;
+          }
+          fetch(`/add_to_cart/${productId}`)
+            .then(res => res.json())
+            .then(data => {
+              alert(data.message || 'Added to cart!');
+            })
+            .catch(() => {
+              alert('Something went wrong while adding to cart.');
+            });
+        },
+
+        buyNow(productId) {
+          if (!IS_LOGGED_IN) {
+            const modal = document.getElementById("loginModal");
+            if (modal) modal.classList.remove("hidden");
+            return;
+          }
+          window.location.href = `/user_checkout/${productId}`;
+        }
+      }));
+    });
+  </script>
+
+</body>
+</html>

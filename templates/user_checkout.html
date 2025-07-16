@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YourStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+  {% include 'user_topbar.html' %}
+
+  <form method="POST" id="checkout-form">
+    {% if cart|length == 1 %}
+      <input type="hidden" name="product_id" value="{{ cart[0].id }}">
+      <input type="hidden" name="qty" value="{{ cart[0].qty }}">
+    {% endif %}
+
+    <main class="py-12">
+      <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Shipping Info -->
+        <div class="lg:col-span-2 bg-white rounded-lg shadow p-6">
+          <h2 class="text-2xl font-bold mb-6">Shipping Information</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <input name="full_name" required placeholder="Full Name" value="{{ user.full_name if user else '' }}" class="p-3 border rounded w-full" />
+            <input name="phone" required placeholder="Phone Number" value="{{ user.phone if user else '' }}" class="p-3 border rounded w-full" />
+          </div>
+          <input name="address1" required placeholder="Address Line 1" class="p-3 border rounded w-full mb-3" />
+          <input name="address2" placeholder="Address Line 2" class="p-3 border rounded w-full mb-3" />
+          <div class="grid grid-cols-2 gap-4 mb-3">
+            <input name="city" required placeholder="City" class="p-3 border rounded w-full" />
+            <input name="state" required placeholder="State" class="p-3 border rounded w-full" />
+          </div>
+          <div class="grid grid-cols-2 gap-4 mb-3">
+            <input name="zip" required placeholder="Zip Code" class="p-3 border rounded w-full" />
+            <input name="country" required placeholder="Country" class="p-3 border rounded w-full" />
+          </div>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <h2 class="text-2xl font-bold mb-6">Order Summary</h2>
+
+          {% if cart %}
+            <div class="space-y-3 mb-6">
+              {% for item in cart %}
+              <div class="flex justify-between text-sm">
+                <span>{{ item.name }} (x{{ item.qty }})</span>
+                <span>₹{{ item.price * item.qty }}</span>
+              </div>
+              {% endfor %}
+            </div>
+
+            <div class="border-t pt-4 mb-4">
+              <div class="flex justify-between">
+                <span class="font-semibold">Subtotal:</span>
+                <span>₹{{ subtotal }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="font-semibold">Shipping:</span>
+                <span>₹{{ shipping_fee }}</span>
+              </div>
+              <div class="flex justify-between text-indigo-600 font-bold text-xl mt-2">
+                <span>Total:</span>
+                <span>₹{{ total }}</span>
+              </div>
+            </div>
+          {% else %}
+            <p class="text-red-600">Your cart is empty.</p>
+          {% endif %}
+
+          <!-- Payment Method -->
+          <h3 class="text-xl font-semibold mb-3">Payment Method</h3>
+          <div class="space-y-2 mb-6">
+            <label class="flex items-center">
+              <input type="radio" name="payment-method" value="upi" class="form-radio text-indigo-600 h-5 w-5" checked />
+              <span class="ml-2">UPI / Card / Net Banking</span>
+            </label>
+            <label class="flex items-center">
+              <input type="radio" name="payment-method" value="cod" class="form-radio text-indigo-600 h-5 w-5" />
+              <span class="ml-2">Cash on Delivery</span>
+            </label>
+          </div>
+
+          <input type="hidden" name="form_total" value="{{ total }}" />
+          <input type="hidden" name="payment_method" id="form-payment-method" value="upi" />
+
+          <button id="place-order-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-6 rounded-lg font-semibold transition">
+            Pay Now
+          </button>
+        </div>
+      </div>
+    </main>
+  </form>
+
+  <!-- ✅ Footer -->
+  <div class="hidden md:block">
+    {% include 'user_footer.html' %}
+  </div>
+
+  <!-- Razorpay + COD Script -->
+  <script>
+    const placeOrderBtn = document.getElementById('place-order-button');
+    const form = document.getElementById('checkout-form');
+    const paymentRadios = document.querySelectorAll('input[name="payment-method"]');
+
+    paymentRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        const selected = document.querySelector('input[name="payment-method"]:checked').value;
+        document.getElementById('form-payment-method').value = selected;
+        placeOrderBtn.textContent = (selected === 'cod') ? 'Place Order' : 'Pay Now';
+      });
+    });
+
+    placeOrderBtn.addEventListener('click', async function (e) {
+      e.preventDefault();
+
+      const selectedMethod = document.querySelector('input[name="payment-method"]:checked').value;
+
+      if (selectedMethod === 'cod') {
+        form.action = '/place_cod_order';
+        form.submit();
+        return;
+      }
+
+      const formData = new FormData(form);
+      const payload = {
+        total: {{ total | tojson | safe }},
+        cart: {{ cart | tojson | safe }},
+        form: {
+          full_name: formData.get('full_name'),
+          phone: formData.get('phone'),
+          address1: formData.get('address1'),
+          address2: formData.get('address2'),
+          city: formData.get('city'),
+          state: formData.get('state'),
+          zip: formData.get('zip'),
+          country: formData.get('country')
+        }
+      };
+
+      try {
+        const res = await fetch('/create_payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (data.error) {
+          alert(data.error);
+          return;
+        }
+
+        const options = {
+          key: data.key_id,
+          amount: data.amount,
+          currency: 'INR',
+          name: 'Yash Cyber Cafe',
+          description: 'Online Order',
+          order_id: data.order_id,
+          handler: async function (response) {
+            try {
+              const verify = await fetch('/payment_success', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                  payment_id: response.razorpay_payment_id,
+                  cart: payload.cart,
+                  form: payload.form
+                })
+              });
+
+              const result = await verify.json();
+              if (result.success) {
+                window.location.href = '/user_orders';
+              } else {
+                alert("⚠️ Payment verified but order not placed.\n" + (result.error || ""));
+              }
+            } catch (error) {
+              console.error("Error placing order:", error);
+              alert("Something went wrong after payment.");
+            }
+          },
+          prefill: {
+            name: data.name,
+            email: data.email,
+            contact: data.contact
+          },
+          theme: {
+            color: '#4f46e5'
+          }
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.open();
+      } catch (err) {
+        console.error("Payment initiation error:", err);
+        alert("Something went wrong while initiating payment.");
+      }
+    });
+  </script>
+</body>
+</html>
